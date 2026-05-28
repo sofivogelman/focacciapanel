@@ -14,6 +14,9 @@ const Store = (() => {
     expenses: [],
 
     recipes: [],
+    flavors: [],
+    formats: [],
+    promos:  [],
   };
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
@@ -80,6 +83,9 @@ const Store = (() => {
     orders:      collection('orders'),
     expenses:    collection('expenses'),
     recipes:     collection('recipes'),
+    flavors:     collection('flavors'),
+    formats:     collection('formats'),
+    promos:      collection('promos'),
 
     /**
      * computeStockImpact — Dado un conjunto de orders, devuelve cuánto

@@ -9,6 +9,7 @@ const Router = (() => {
     inventory: { title: 'Ingredientes', module: () => InventoryModule,  primaryLabel: 'Agregar stock',   primaryRoute: null },
     clients:   { title: 'Clientes',     module: () => ClientsModule,    primaryLabel: 'Nuevo cliente',   primaryRoute: null },
     finances:  { title: 'Finanzas',     module: () => FinancesModule,   primaryLabel: 'Agregar gasto',   primaryRoute: null },
+    config:    { title: 'Configuración', module: () => ConfigModule,     primaryLabel: '',                primaryRoute: null },
   };
 
   let current = null;
@@ -25,7 +26,9 @@ const Router = (() => {
     // Update topbar
     document.getElementById('topbarTitle').textContent = routes[route].title;
     const primaryBtn = document.getElementById('topbarPrimaryBtn');
-    document.getElementById('topbarPrimaryLabel').textContent = routes[route].primaryLabel;
+    const label = routes[route].primaryLabel;
+    document.getElementById('topbarPrimaryLabel').textContent = label;
+    primaryBtn.style.display = label ? '' : 'none';
 
     // Render module
     const mod = routes[route].module();
