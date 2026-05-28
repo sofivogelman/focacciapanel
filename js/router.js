@@ -5,7 +5,7 @@ const Router = (() => {
   const routes = {
     dashboard: { title: 'Resumen',      module: () => DashboardModule,  primaryLabel: 'Nuevo pedido',    primaryRoute: 'orders' },
     orders:    { title: 'Pedidos',      module: () => OrdersModule,     primaryLabel: 'Nuevo pedido',    primaryRoute: null },
-    products:  { title: 'Productos',    module: () => ProductsModule,   primaryLabel: 'Nuevo producto',  primaryRoute: null },
+    products:  { title: 'Catálogo',     module: () => ProductsModule,   primaryLabel: '',                primaryRoute: null },
     inventory: { title: 'Ingredientes', module: () => InventoryModule,  primaryLabel: 'Agregar stock',   primaryRoute: null },
     clients:   { title: 'Clientes',     module: () => ClientsModule,    primaryLabel: 'Nuevo cliente',   primaryRoute: null },
     finances:  { title: 'Finanzas',     module: () => FinancesModule,   primaryLabel: 'Agregar gasto',   primaryRoute: null },

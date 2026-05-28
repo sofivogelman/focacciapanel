@@ -48,20 +48,28 @@ const Sync = (() => {
   }
 
   /**
-   * matchProduct — Busca el producto del catálogo más afín al sabor pedido.
-   * Divide el flavor en palabras clave y cuenta hits en el nombre del producto.
-   * Ejemplo: "Tomate Cherry y Pesto" → hits en "Focaccia de Tomate Cherry"
+   * matchProduct — Busca el sabor configurado más afín al flavor del pedido.
+   * Usa Store.flavors (config) como fuente primaria; Store.products como fallback.
    */
   function matchProduct(flavor) {
     if (!flavor) return null;
-    const words    = flavor.toLowerCase().split(/[\s,y\+&]+/).filter(w => w.length > 2);
+    // Limpiar calificadores de promo antes de buscar el sabor base
+    const clean = flavor.replace(/\(sin\s+individual[^)]*\)/gi, '').trim();
+    const words  = clean.toLowerCase().split(/[\s,()y\+&]+/).filter(w => w.length > 2);
+
+    const cfgFlavors = Store.flavors.where(f => f.active);
+    if (cfgFlavors.length > 0) {
+      const scored = cfgFlavors
+        .map(f => ({ f, hits: words.filter(w => f.name.toLowerCase().includes(w)).length }))
+        .filter(s => s.hits > 0)
+        .sort((a, b) => b.hits - a.hits);
+      if (scored[0]) return { id: null, name: scored[0].f.name, price: 0 };
+    }
+
+    // Fallback: Store.products (catálogo manual previo)
     const products = Store.products.where(p => p.active);
     const scored   = products
-      .map(p => {
-        const pLow = p.name.toLowerCase();
-        const hits = words.filter(w => pLow.includes(w)).length;
-        return { p, hits };
-      })
+      .map(p => ({ p, hits: words.filter(w => p.name.toLowerCase().includes(w)).length }))
       .filter(s => s.hits > 0)
       .sort((a, b) => b.hits - a.hits);
     return scored[0]?.p || null;
