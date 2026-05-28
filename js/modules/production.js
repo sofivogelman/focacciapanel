@@ -2,8 +2,8 @@ const ProductionModule = (() => {
 
   // ─── Constantes de receta ─────────────────────────────────────────────────────
   const MASA_G = { familiar: 900, individual: 280 };
-  const MASA_POR_BOLSA  = 955;  // gramos de masa por cada bolsa de 500g harina
-  const HARINA_POR_BOLSA = 500; // gramos de harina por bolsa (unidad de trabajo)
+  const MASA_POR_BOLSA   = 1910; // gramos de masa por cada bolsa de 1kg harina
+  const HARINA_POR_BOLSA = 1000; // gramos de harina por bolsa (unidad de trabajo)
 
   // ─── Detección de individual de regalo ───────────────────────────────────────
   function tieneRegalo(flavor) {
@@ -34,27 +34,35 @@ const ProductionModule = (() => {
       });
     });
 
-    return Object.entries(byDate).map(([date, c]) => {
-      const masaNeta    = c.familiares * MASA_G.familiar
-                        + (c.individuales + c.regalo) * MASA_G.individual;
-      const bolsas      = Math.ceil(masaNeta / MASA_POR_BOLSA);
-      const masaFinal   = bolsas * MASA_POR_BOLSA;
-      const harinaFinal = bolsas * HARINA_POR_BOLSA;
+    let overflow = 0; // sobrante del día anterior que se traslada al siguiente
 
-      const masaHecha = logs
-        .filter(l => l.deliveryDate === date)
-        .reduce((s, l) => s + (l.grams || 0), 0);
+    return Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, c]) => {
+        const masaNeta    = c.familiares * MASA_G.familiar
+                          + (c.individuales + c.regalo) * MASA_G.individual;
+        const bolsas      = Math.ceil(masaNeta / MASA_POR_BOLSA);
+        const masaFinal   = bolsas * MASA_POR_BOLSA;
+        const harinaFinal = bolsas * HARINA_POR_BOLSA;
 
-      const masaPendiente  = Math.max(0, masaFinal - masaHecha);
-      const bolsasPendientes = Math.ceil(masaPendiente / MASA_POR_BOLSA);
+        const masaLograda = logs
+          .filter(l => l.deliveryDate === date)
+          .reduce((s, l) => s + (l.grams || 0), 0);
 
-      return {
-        date, counts: c,
-        masaNeta, bolsas, masaFinal, harinaFinal,
-        masaHecha, masaPendiente, bolsasPendientes,
-        completa: masaHecha >= masaFinal && masaFinal > 0,
-      };
-    }).sort((a, b) => a.date.localeCompare(b.date));
+        const masaHecha    = masaLograda + overflow;
+        const masaSobrante = Math.max(0, masaHecha - masaFinal);
+        overflow           = masaSobrante; // se traslada al próximo día
+
+        const masaPendiente    = Math.max(0, masaFinal - masaHecha);
+        const bolsasPendientes = Math.ceil(masaPendiente / MASA_POR_BOLSA);
+
+        return {
+          date, counts: c,
+          masaNeta, bolsas, masaFinal, harinaFinal,
+          masaLograda, masaHecha, masaSobrante, masaPendiente, bolsasPendientes,
+          completa: masaHecha >= masaFinal && masaFinal > 0,
+        };
+      });
   }
 
   // ─── Formateo de fecha ────────────────────────────────────────────────────────
@@ -76,7 +84,7 @@ const ProductionModule = (() => {
         <div class="page-header">
           <div>
             <h1 class="page-title">Producción</h1>
-            <p class="page-subtitle">Masa necesaria para pedidos pendientes · redondeado a bolsas de 500g</p>
+            <p class="page-subtitle">Masa necesaria para pedidos pendientes · redondeado a bolsas de 1kg</p>
           </div>
         </div>
 
@@ -97,9 +105,9 @@ const ProductionModule = (() => {
   function renderDayCard(p) {
     const c = p.counts;
     const detalleItems = [
-      c.familiares  ? `${c.familiares}× Familiar`    : '',
-      c.individuales ? `${c.individuales}× Individual` : '',
-      c.regalo      ? `+ ${c.regalo}× Individual de regalo` : '',
+      c.familiares   ? `${c.familiares}× Familiar`           : '',
+      c.individuales ? `${c.individuales}× Individual`        : '',
+      c.regalo       ? `+ ${c.regalo}× Individual de regalo`  : '',
     ].filter(Boolean);
 
     const summaryColor = p.completa
@@ -111,6 +119,8 @@ const ProductionModule = (() => {
     const summaryBg = p.completa
       ? 'var(--color-success-subtle, #f0faf0)'
       : 'var(--color-primary-subtle)';
+
+    const overflowUsed = p.masaHecha - p.masaLograda; // masa que vino del día anterior
 
     return `
       <div class="card" style="margin-bottom:var(--space-4)${p.completa ? ';opacity:0.65' : ''}">
@@ -143,10 +153,16 @@ const ProductionModule = (() => {
             <div class="text-sm">Necesaria exacta: <strong>${p.masaNeta}g</strong></div>
             <div class="text-sm">Con margen (↑ bolsa): <strong>${p.masaFinal}g</strong> (${p.bolsas} bolsa${p.bolsas !== 1 ? 's' : ''} · ${p.harinaFinal}g harina)</div>
             ${p.masaHecha > 0 ? `
-              <div class="text-sm" style="color:var(--color-success);margin-top:var(--space-1)">✓ Ya hecha: ${p.masaHecha}g (${Math.round(p.masaHecha / MASA_POR_BOLSA)} bolsa${Math.round(p.masaHecha / MASA_POR_BOLSA) !== 1 ? 's' : ''})</div>
+              <div class="text-sm" style="color:var(--color-success);margin-top:var(--space-1)">
+                ✓ Disponible: ${p.masaHecha}g
+                ${overflowUsed > 0 ? `<span style="color:var(--color-text-muted);font-weight:400"> (${p.masaLograda}g propia + ${overflowUsed}g sobrante del día anterior)</span>` : ''}
+              </div>
             ` : ''}
             ${!p.completa && p.masaHecha > 0 ? `
               <div class="text-sm font-semibold" style="color:var(--color-warning)">Falta: ${p.masaPendiente}g (${p.bolsasPendientes} bolsa${p.bolsasPendientes !== 1 ? 's' : ''})</div>
+            ` : ''}
+            ${p.masaSobrante > 0 ? `
+              <div class="text-sm" style="color:var(--color-text-muted)">Sobrante → siguiente día: ${p.masaSobrante}g</div>
             ` : ''}
           </div>
         </div>
@@ -155,8 +171,8 @@ const ProductionModule = (() => {
           ${p.completa
             ? `✓ Masa completa — todo listo para ${fmtDate(p.date)}`
             : p.masaHecha > 0
-              ? `Todavía falta hacer: ${p.bolsasPendientes} bolsa${p.bolsasPendientes !== 1 ? 's' : ''} de harina (${p.bolsasPendientes * HARINA_POR_BOLSA}g harina → ${p.masaPendiente}g masa)`
-              : `Preparar: ${p.bolsas} bolsa${p.bolsas !== 1 ? 's' : ''} de harina (${p.harinaFinal}g harina → ${p.masaFinal}g masa)`
+              ? `Todavía falta hacer: ${p.bolsasPendientes} bolsa${p.bolsasPendientes !== 1 ? 's' : ''} de 1kg (${p.bolsasPendientes * HARINA_POR_BOLSA}g harina → ${p.masaPendiente}g masa)`
+              : `Preparar: ${p.bolsas} bolsa${p.bolsas !== 1 ? 's' : ''} de 1kg (${p.harinaFinal}g harina → ${p.masaFinal}g masa)`
           }
         </div>
       </div>
@@ -173,7 +189,7 @@ const ProductionModule = (() => {
           Fecha de entrega: <strong style="text-transform:capitalize">${fmtDate(deliveryDate)}</strong>
         </p>
         <div class="form-group">
-          <label class="form-label">Bolsas de 500g harina usadas</label>
+          <label class="form-label">Bolsas de 1kg harina usadas</label>
           <input class="form-input" id="fMasaBolsas" type="number" min="1" step="1"
             value="${bolsasSugeridas}"
             oninput="document.getElementById('fMasaCalc').textContent = (parseInt(this.value)||0) * ${MASA_POR_BOLSA} + 'g de masa · ' + (parseInt(this.value)||0) * ${HARINA_POR_BOLSA} + 'g harina'" />
