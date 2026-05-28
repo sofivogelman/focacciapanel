@@ -287,28 +287,62 @@ const OrdersModule = (() => {
   function openDetail(id) {
     const o = Store.orders.find(id);
     if (!o) return;
-    const { badge, label } = STATUS_MAP[o.status] || { badge: 'badge-default', label: o.status };
     App.openModal({
       title: `Pedido #${o.id}`,
       body: `
-        <div style="display: flex; flex-direction: column; gap: var(--space-4)">
-          <div class="d-flex justify-between items-center">
+        <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+
+          <div class="d-flex justify-between items-start">
             <div>
-              <div class="text-sm text-secondary">Cliente</div>
+              <div class="text-xs text-muted">Cliente</div>
               <div class="font-semibold">${o.clientName}</div>
+              ${o.zone ? `<div class="text-xs text-muted" style="margin-top:2px">${o.zone}</div>` : ''}
             </div>
-            <span class="badge ${badge}">${label}</span>
+            <div class="text-xs text-muted text-right">Pedido ${o.date}</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Campos editables -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Estado</label>
+              <select class="form-select" id="dOrderStatus">
+                ${Object.entries(STATUS_MAP).map(([k,v]) =>
+                  `<option value="${k}" ${o.status === k ? 'selected' : ''}>${v.label}</option>`
+                ).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha de entrega</label>
+              <input type="date" class="form-input" id="dOrderDelivery" value="${o.deliveryDate || ''}" />
+            </div>
           </div>
           <div class="form-row">
-            <div><div class="text-xs text-muted">Fecha pedido</div><div class="text-sm">${o.date}</div></div>
-            <div><div class="text-xs text-muted">Fecha entrega</div><div class="text-sm">${o.deliveryDate}</div></div>
-            <div><div class="text-xs text-muted">Pago</div><div class="text-sm">${o.paymentMethod} · ${o.paid ? '✓ Cobrado' : '⏳ Pendiente'}</div></div>
+            <div class="form-group">
+              <label class="form-label">Método de pago</label>
+              <select class="form-select" id="dOrderPayment">
+                <option value="efectivo"      ${o.paymentMethod === 'efectivo'      ? 'selected' : ''}>Efectivo</option>
+                <option value="transferencia" ${o.paymentMethod === 'transferencia' ? 'selected' : ''}>Transferencia</option>
+                <option value="debito"        ${o.paymentMethod === 'debito'        ? 'selected' : ''}>Débito</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">¿Cobrado?</label>
+              <select class="form-select" id="dOrderPaid">
+                <option value="no" ${!o.paid ? 'selected' : ''}>No cobrado</option>
+                <option value="si" ${ o.paid ? 'selected' : ''}>Cobrado</option>
+              </select>
+            </div>
           </div>
+
           <div class="divider"></div>
+
+          <!-- Items (solo lectura) -->
           <div>
-            <div class="text-xs text-muted" style="margin-bottom: var(--space-2)">Productos</div>
+            <div class="text-xs text-muted" style="margin-bottom:var(--space-2)">Productos</div>
             ${o.items.map(i => `
-              <div class="d-flex justify-between items-center" style="padding: var(--space-2) 0; border-bottom: var(--border-light)">
+              <div class="d-flex justify-between items-center" style="padding:var(--space-2) 0;border-bottom:var(--border-light)">
                 <span class="text-sm">${i.name}</span>
                 <div class="d-flex gap-4">
                   <span class="text-sm text-secondary">${i.qty} × $${i.price.toLocaleString('es-AR')}</span>
@@ -316,17 +350,27 @@ const OrdersModule = (() => {
                 </div>
               </div>
             `).join('')}
-            <div class="d-flex justify-between items-center mt-2">
+            <div class="d-flex justify-between items-center" style="margin-top:var(--space-3)">
               <span class="font-semibold">Total</span>
-              <span class="font-semibold text-primary">$${o.total.toLocaleString('es-AR')}</span>
+              <span class="font-semibold" style="color:var(--color-primary)">$${o.total.toLocaleString('es-AR')}</span>
             </div>
           </div>
+
           ${o.notes ? `<div><div class="text-xs text-muted">Notas</div><div class="text-sm">${o.notes}</div></div>` : ''}
         </div>
       `,
-      primaryLabel: 'Cerrar',
-      hideCancelBtn: true,
-      onConfirm: () => true,
+      primaryLabel: 'Guardar cambios',
+      onConfirm: () => {
+        Store.orders.update(id, {
+          status:        document.getElementById('dOrderStatus').value,
+          deliveryDate:  document.getElementById('dOrderDelivery').value,
+          paymentMethod: document.getElementById('dOrderPayment').value,
+          paid:          document.getElementById('dOrderPaid').value === 'si',
+        });
+        refreshTable();
+        App.toast('success', 'Pedido actualizado');
+        return true;
+      },
     });
   }
 
