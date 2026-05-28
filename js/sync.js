@@ -125,7 +125,19 @@ const Sync = (() => {
     const total      = sheetTotal > 0 ? sheetTotal : calcTotal;
 
     // 4. Fechas: usar col B (date), fallback a timestamp truncado
-    const orderDate = row.date || (row.timestamp ? row.timestamp.slice(0, 10) : null)
+    // Normaliza DD/MM/YY o DD/MM/YYYY → YYYY-MM-DD
+    function toISODate(str) {
+      if (!str) return null;
+      if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.slice(0, 10);
+      const p = str.split('/');
+      if (p.length === 3) {
+        const y = p[2].length === 2 ? '20' + p[2] : p[2];
+        return `${y}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+      }
+      return null;
+    }
+    const orderDate = toISODate(row.date)
+      || (row.timestamp ? row.timestamp.slice(0, 10) : null)
       || new Date().toISOString().slice(0, 10);
     const delivDate = new Date(new Date(orderDate + 'T12:00:00').getTime() + 2 * 864e5)
       .toISOString().slice(0, 10);
