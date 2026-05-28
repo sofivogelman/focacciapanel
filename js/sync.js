@@ -177,7 +177,7 @@ const Sync = (() => {
         ? storeItems
         : [{ productId: null, name: 'Pedido sin detallar', qty: 1, price: total }],
       total,
-      paymentMethod: 'efectivo',
+      paymentMethod: 'indefinido',
       paid:          false,
       notes:         row.notes || '',
       zone:          row.zone  || '',

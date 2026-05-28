@@ -35,7 +35,7 @@ const OrdersModule = (() => {
           <div class="font-medium">${o.clientName}</div>
           <div class="text-xs text-secondary">${itemSummary.length > 40 ? itemSummary.slice(0,40)+'…' : itemSummary}</div>
         </td>
-        <td class="text-secondary text-sm">${o.deliveryDate}</td>
+        <td class="text-secondary text-sm">${o.deliveryDate}${o.deliveryTime ? ' ' + o.deliveryTime : ''}</td>
         <td>${statusBadge(o.status)}</td>
         <td class="font-medium">${fmt(o.total)}</td>
         <td>
@@ -315,16 +315,19 @@ const OrdersModule = (() => {
             </div>
             <div class="form-group">
               <label class="form-label">Fecha de entrega</label>
-              <input type="date" class="form-input" id="dOrderDelivery" value="${o.deliveryDate || ''}" />
+              <div class="d-flex gap-2">
+                <input type="date" class="form-input" id="dOrderDelivery" value="${o.deliveryDate || ''}" style="flex:1" />
+                <input type="time" class="form-input" id="dOrderDeliveryTime" value="${o.deliveryTime || ''}" style="width:110px" />
+              </div>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Método de pago</label>
               <select class="form-select" id="dOrderPayment">
+                <option value="indefinido"    ${(o.paymentMethod === 'indefinido' || !o.paymentMethod) ? 'selected' : ''}>Indefinido</option>
                 <option value="efectivo"      ${o.paymentMethod === 'efectivo'      ? 'selected' : ''}>Efectivo</option>
                 <option value="transferencia" ${o.paymentMethod === 'transferencia' ? 'selected' : ''}>Transferencia</option>
-                <option value="debito"        ${o.paymentMethod === 'debito'        ? 'selected' : ''}>Débito</option>
               </select>
             </div>
             <div class="form-group">
@@ -364,6 +367,7 @@ const OrdersModule = (() => {
         Store.orders.update(id, {
           status:        document.getElementById('dOrderStatus').value,
           deliveryDate:  document.getElementById('dOrderDelivery').value,
+          deliveryTime:  document.getElementById('dOrderDeliveryTime').value,
           paymentMethod: document.getElementById('dOrderPayment').value,
           paid:          document.getElementById('dOrderPaid').value === 'si',
         });
