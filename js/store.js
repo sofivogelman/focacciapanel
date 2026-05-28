@@ -41,9 +41,10 @@ const Store = (() => {
       { id:9,  formatName:'Individual', ingredientId:4, qty:2,   createdAt:'2026-05-28' },
       { id:10, formatName:'Individual', ingredientId:5, qty:4,   createdAt:'2026-05-28' },
     ],
-    flavors: [],
-    formats: [],
-    promos:  [],
+    flavors:  [],
+    formats:  [],
+    promos:   [],
+    masaLog:  [],
   };
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ const Store = (() => {
     flavors:     collection('flavors'),
     formats:     collection('formats'),
     promos:      collection('promos'),
+    masaLog:     collection('masaLog'),
 
     /**
      * computeStockImpact — Dado un conjunto de orders, devuelve cuánto
