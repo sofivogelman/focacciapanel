@@ -213,7 +213,7 @@ function focacciaParseItems(rawCell) {
   // Google Sheets guarda Alt+Enter como \n en GAS
   const lines = raw.split(/\r?\n/).map(function(l) { return l.trim(); }).filter(Boolean);
 
-  var ITEM_RE = /^(\d+)\s*[xX×]\s+([^(]+?)\s*\(([^)]+)\)\s*$/;
+  var ITEM_RE = /^(\d+)\s*[xX×]\s+([^(]+?)\s*\((.+)\)\s*$/;
   var items   = [];
 
   lines.forEach(function(line) {

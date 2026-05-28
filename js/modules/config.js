@@ -132,11 +132,12 @@ const ConfigModule = (() => {
         ${items.length === 0
           ? `<p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">Sin formatos cargados todavía.</p>`
           : `<table class="table">
-              <thead><tr><th>Nombre</th><th>Estado</th><th></th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Precio</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 ${items.map(f => `
                   <tr>
                     <td class="font-medium">${escHtml(f.name)}</td>
+                    <td class="text-sm">${f.price ? '$' + Number(f.price).toLocaleString('es-AR') : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                     <td><span class="badge ${f.active ? 'badge-success' : 'badge-default'}">${f.active ? 'Activo' : 'Inactivo'}</span></td>
                     <td class="cfg-actions">
                       <button class="btn btn-xs btn-ghost" onclick="ConfigModule.editFormat(${f.id})">Editar</button>
@@ -152,21 +153,34 @@ const ConfigModule = (() => {
     `;
   }
 
+  function formatModalBody(f) {
+    return `
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombre *</label>
+          <input class="form-input" id="fFormatName" value="${escHtml(f?.name || '')}"
+            placeholder="ej: Familiar" autofocus />
+          <div class="form-hint">Igual que aparece en los pedidos.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Precio ($)</label>
+          <input class="form-input" id="fFormatPrice" type="number" min="0"
+            value="${f?.price || ''}" placeholder="ej: 3500" />
+        </div>
+      </div>
+    `;
+  }
+
   function openAddFormat() {
     App.openModal({
       title: 'Agregar formato',
-      body: `
-        <div class="form-group">
-          <label class="form-label">Nombre *</label>
-          <input class="form-input" id="fFormatName" placeholder="ej: Familiar" autofocus />
-          <div class="form-hint">Nombre exacto tal como aparece en los pedidos (ej: Familiar, Mediana, Promo).</div>
-        </div>
-      `,
+      body: formatModalBody(null),
       primaryLabel: 'Agregar',
       onConfirm: () => {
-        const name = document.getElementById('fFormatName').value.trim();
+        const name  = document.getElementById('fFormatName').value.trim();
+        const price = parseFloat(document.getElementById('fFormatPrice').value) || 0;
         if (!name) { App.toast('error', 'Ingresá el nombre del formato'); return false; }
-        Store.formats.create({ name, active: true });
+        Store.formats.create({ name, price, active: true });
         renderFormats();
         return true;
       },
@@ -178,17 +192,13 @@ const ConfigModule = (() => {
     if (!f) return;
     App.openModal({
       title: 'Editar formato',
-      body: `
-        <div class="form-group">
-          <label class="form-label">Nombre</label>
-          <input class="form-input" id="fFormatName" value="${escHtml(f.name)}" />
-        </div>
-      `,
+      body: formatModalBody(f),
       primaryLabel: 'Guardar',
       onConfirm: () => {
-        const name = document.getElementById('fFormatName').value.trim();
+        const name  = document.getElementById('fFormatName').value.trim();
+        const price = parseFloat(document.getElementById('fFormatPrice').value) || 0;
         if (!name) return false;
-        Store.formats.update(id, { name });
+        Store.formats.update(id, { name, price });
         renderFormats();
         return true;
       },
@@ -230,6 +240,7 @@ const ConfigModule = (() => {
               <thead>
                 <tr>
                   <th>Nombre de la promo</th>
+                  <th>Precio</th>
                   <th>Sabores que incluye</th>
                   <th>Notas</th>
                   <th>Estado</th>
@@ -240,6 +251,7 @@ const ConfigModule = (() => {
                 ${items.map(p => `
                   <tr>
                     <td class="font-medium">${escHtml(p.name)}</td>
+                    <td class="text-sm">${p.price ? '$' + Number(p.price).toLocaleString('es-AR') : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                     <td class="text-sm" style="color:var(--color-text-secondary)">
                       ${(p.flavors || []).length > 0
                         ? p.flavors.map(f => `<span class="badge badge-primary" style="margin-right:2px;margin-bottom:2px">${escHtml(f)}</span>`).join('')
@@ -286,10 +298,17 @@ const ConfigModule = (() => {
             </div>`
         }
       </div>
-      <div class="form-group">
-        <label class="form-label">Notas</label>
-        <input class="form-input" id="fPromoNotes" value="${escHtml(p?.notes || '')}"
-          placeholder="ej: Válida solo los sábados" />
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Precio ($)</label>
+          <input class="form-input" id="fPromoPrice" type="number" min="0"
+            value="${p?.price || ''}" placeholder="ej: 4000" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notas</label>
+          <input class="form-input" id="fPromoNotes" value="${escHtml(p?.notes || '')}"
+            placeholder="ej: Válida solo los sábados" />
+        </div>
       </div>
     `;
   }
@@ -301,11 +320,12 @@ const ConfigModule = (() => {
       body: promoModalBody(null),
       primaryLabel: 'Agregar',
       onConfirm: () => {
-        const name = document.getElementById('fPromoName').value.trim();
+        const name  = document.getElementById('fPromoName').value.trim();
         if (!name) { App.toast('error', 'Ingresá el nombre de la promo'); return false; }
+        const price   = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
         const flavors = [...document.querySelectorAll('.checkbox-item input:checked')].map(cb => cb.value);
         const notes   = (document.getElementById('fPromoNotes')?.value || '').trim();
-        Store.promos.create({ name, flavors, notes, active: true });
+        Store.promos.create({ name, price, flavors, notes, active: true });
         renderPromos();
         return true;
       },
@@ -321,11 +341,12 @@ const ConfigModule = (() => {
       body: promoModalBody(p),
       primaryLabel: 'Guardar',
       onConfirm: () => {
-        const name = document.getElementById('fPromoName').value.trim();
+        const name  = document.getElementById('fPromoName').value.trim();
         if (!name) return false;
+        const price   = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
         const flavors = [...document.querySelectorAll('.checkbox-item input:checked')].map(cb => cb.value);
         const notes   = (document.getElementById('fPromoNotes')?.value || '').trim();
-        Store.promos.update(id, { name, flavors, notes });
+        Store.promos.update(id, { name, price, flavors, notes });
         renderPromos();
         return true;
       },

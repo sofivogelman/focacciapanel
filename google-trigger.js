@@ -187,7 +187,7 @@ function parseItems(rawCell) {
   // Dividir por saltos de línea (Alt+Enter produce \n en GAS)
   const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-  const ITEM_RE = /^(\d+)\s*[xX×]\s+([^(]+?)\s*\(([^)]+)\)\s*$/;
+  const ITEM_RE = /^(\d+)\s*[xX×]\s+([^(]+?)\s*\((.+)\)\s*$/;
   const items   = [];
 
   lines.forEach(line => {

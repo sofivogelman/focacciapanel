@@ -106,9 +106,17 @@ const Sync = (() => {
     // 2. Convertir [{qty, format, flavor}] → store items [{productId, name, qty, price, format, flavor}]
     const gasItems   = Array.isArray(row.items) ? row.items : [];
     const storeItems = gasItems.map(gi => {
-      const product  = matchProduct(gi.flavor);
-      const modifier = formatModifier(gi.format);
-      const price    = product ? Math.round(product.price * modifier) : 0;
+      // Buscar precio: promo configurada > formato configurado > producto > 0
+      const cfgPromo  = typeof ConfigModule !== 'undefined' ? ConfigModule.resolvePromo(gi.flavor) : null;
+      const cfgFormat = Store.formats.where(f => f.active && f.name.toLowerCase() === (gi.format || '').toLowerCase())[0];
+      const product   = matchProduct(gi.flavor);
+      const modifier  = formatModifier(gi.format);
+
+      let price = 0;
+      if (cfgPromo?.promo?.price)  price = cfgPromo.promo.price;
+      else if (cfgFormat?.price)   price = cfgFormat.price;
+      else if (product)            price = Math.round(product.price * modifier);
+
       return {
         productId: product?.id || null,
         name:      buildItemName(gi),
