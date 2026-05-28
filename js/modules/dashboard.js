@@ -13,58 +13,102 @@ const DashboardModule = (() => {
 
   function fmt(n) { return '$' + n.toLocaleString('es-AR'); }
 
-  // ─── Gráfico de barras horizontales ─────────────────────────────────────────
-  function barChart(entries, maxVal, colorVar, emptyMsg) {
-    if (entries.length === 0) {
-      return `<div class="empty-state" style="padding:var(--space-8)">
-                <div class="empty-state-title">${emptyMsg}</div>
-              </div>`;
+  // ─── Recordatorio de masa ────────────────────────────────────────────────────
+  function renderMasaReminder() {
+    const MASA_G           = { familiar: 900, individual: 280 };
+    const MASA_POR_BOLSA   = 1910;
+    const HARINA_POR_BOLSA = 1000;
+
+    function tieneRegalo(flavor) {
+      const f = (flavor || '').toLowerCase();
+      return f.includes('regalo') && !f.includes('sin individual');
     }
-    return entries.map(([label, val]) => {
-      const pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
-      return `
-        <div style="display:flex; align-items:center; gap:var(--space-3)">
-          <div style="width:120px; font-size:var(--text-xs); color:var(--color-text-secondary); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0"
-               title="${label}">${label}</div>
-          <div style="flex:1; height:10px; background:var(--color-border-light); border-radius:var(--radius-full); overflow:hidden">
-            <div style="height:100%; width:${pct}%; background:${colorVar}; border-radius:var(--radius-full); transition:width 0.4s ease"></div>
-          </div>
-          <div style="width:28px; font-size:var(--text-xs); font-weight:var(--font-semibold); color:var(--color-text-secondary)">${val}</div>
-        </div>
-      `;
-    }).join('');
-  }
 
-  // ─── Calcular tendencias ─────────────────────────────────────────────────────
-  function computeTrends() {
-    const allOrders = Store.orders.all();
+    const pending = Store.orders.where(o => o.status === 'pendiente');
+    if (pending.length === 0) return '';
 
-    // Sabores: suma de qty por nombre de item
-    const flavorMap = {};
-    allOrders.forEach(o => {
-      (o.items || []).forEach(i => {
-        const name = i.name || 'Desconocido';
-        flavorMap[name] = (flavorMap[name] || 0) + (i.qty || 1);
+    const byDate = {};
+    pending.forEach(order => {
+      const date = order.deliveryDate || order.date || '—';
+      if (date === '—') return;
+      if (!byDate[date]) byDate[date] = { familiares: 0, individuales: 0, regalo: 0 };
+      (order.items || []).forEach(item => {
+        const fmt = (item.format || '').toLowerCase();
+        const qty = item.qty || 1;
+        if (fmt === 'familiar') {
+          byDate[date].familiares += qty;
+          if (tieneRegalo(item.flavor)) byDate[date].regalo += qty;
+        } else if (fmt === 'individual') {
+          byDate[date].individuales += qty;
+        }
       });
     });
-    const flavors = Object.entries(flavorMap).sort((a, b) => b[1] - a[1]);
 
-    // Zonas: conteo de pedidos por zona/barrio
-    const zoneMap = {};
-    allOrders.forEach(o => {
-      let zone = o.zone || '';
-      if (!zone && o.clientId) {
-        const c = Store.clients.find(o.clientId);
-        zone = c?.address || '';
-      }
-      if (zone) {
-        const zoneKey = zone.split(',')[0].trim();
-        if (zoneKey) zoneMap[zoneKey] = (zoneMap[zoneKey] || 0) + 1;
-      }
-    });
-    const zones = Object.entries(zoneMap).sort((a, b) => b[1] - a[1]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const msDay = 24 * 60 * 60 * 1000;
 
-    return { flavors, zones };
+    let overflow = 0;
+    const reminders = Object.entries(byDate)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, c]) => {
+        const masaNeta       = c.familiares * MASA_G.familiar + (c.individuales + c.regalo) * MASA_G.individual;
+        const bolsas         = Math.ceil(masaNeta / MASA_POR_BOLSA);
+        const masaFinal      = bolsas * MASA_POR_BOLSA;
+        const masaLograda    = Store.masaLog.where(l => l.deliveryDate === date).reduce((s, l) => s + (l.grams || 0), 0);
+        const masaHecha      = masaLograda + overflow;
+        overflow             = Math.max(0, masaHecha - masaFinal);
+        const masaPendiente  = Math.max(0, masaFinal - masaHecha);
+        const bolsasPend     = Math.ceil(masaPendiente / MASA_POR_BOLSA);
+        const completa       = masaHecha >= masaFinal && masaFinal > 0;
+
+        const deliveryD = new Date(date + 'T12:00:00');
+        const deadline  = new Date(deliveryD.getTime() - 48 * msDay);
+        deadline.setHours(0, 0, 0, 0);
+        const daysLeft = Math.round((deadline - today) / msDay);
+
+        return { date, masaPendiente, bolsasPend, harinaFinal: bolsasPend * HARINA_POR_BOLSA, completa, deliveryD, deadline, daysLeft };
+      })
+      .filter(r => !r.completa && r.masaPendiente > 0);
+
+    if (reminders.length === 0) return '';
+
+    const fmtDate = d => d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    return `
+      <div class="card" style="margin-bottom:var(--space-6); border-color:var(--color-primary)">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Próxima masa a preparar</div>
+            <div class="card-subtitle">Planificá 48hs antes de cada entrega</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="Router.navigate('produccion')">Ver producción</button>
+        </div>
+        ${reminders.slice(0, 3).map(r => {
+          const overdue  = r.daysLeft < 0;
+          const todayDue = r.daysLeft === 0;
+          const color    = overdue ? 'var(--color-danger)' : todayDue ? 'var(--color-warning)' : 'var(--color-text-primary)';
+          let label;
+          if (overdue)        label = `Debería estar hecha — entrega ${fmtDate(r.deliveryD)}`;
+          else if (todayDue)  label = `Hacerla hoy — entrega ${fmtDate(r.deliveryD)}`;
+          else if (r.daysLeft === 1) label = `Hacerla mañana — entrega ${fmtDate(r.deliveryD)}`;
+          else                label = `Antes del ${fmtDate(r.deadline)} — entrega ${fmtDate(r.deliveryD)}`;
+
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:var(--space-3) 0; border-bottom:1px solid var(--color-border-light)">
+              <div>
+                <div class="text-sm font-semibold" style="color:${color}; text-transform:capitalize">${label}</div>
+                <div class="text-xs" style="color:var(--color-text-muted); margin-top:2px">
+                  ${r.bolsasPend} bolsa${r.bolsasPend !== 1 ? 's' : ''} de 1kg · ${r.harinaFinal}g harina → ${r.masaPendiente}g masa
+                </div>
+              </div>
+              ${overdue  ? '<span class="badge badge-danger">Urgente</span>' : ''}
+              ${todayDue ? '<span class="badge badge-warning">Hoy</span>'   : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
   }
 
   // ─── Sección de impacto en stock ─────────────────────────────────────────────
@@ -187,14 +231,11 @@ const DashboardModule = (() => {
 
   // ─── Render principal ────────────────────────────────────────────────────────
   function render(container) {
-    const stats       = Store.stats();
-    const allOrders   = Store.orders.all().sort((a, b) => b.id - a.id);
+    const stats        = Store.stats();
+    const allOrders    = Store.orders.all().sort((a, b) => b.id - a.id);
     const recentOrders = allOrders.slice(0, 5);
-    const lowStock    = Store.ingredients.where(i => i.stock <= i.minStock * 1.3);
-    const gasCount    = Store.orders.where(o => o.fromGAS).length;
-    const { flavors, zones } = computeTrends();
-    const maxFlavor   = flavors[0]?.[1] || 1;
-    const maxZone     = zones[0]?.[1]   || 1;
+    const lowStock     = Store.ingredients.where(i => i.stock <= i.minStock * 1.3);
+    const gasCount     = Store.orders.where(o => o.fromGAS).length;
 
     container.innerHTML = `
       <div class="fade-in">
@@ -318,67 +359,8 @@ const DashboardModule = (() => {
           </div>
         </div>
 
-        <!-- Tendencias -->
-        <div class="grid-2" style="align-items:start; margin-bottom:var(--space-8)">
-
-          <!-- Sabores más pedidos -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Sabores más pedidos</div>
-                <div class="card-subtitle">Por unidades totales</div>
-              </div>
-              ${flavors.length > 0 ? `
-                <span class="badge badge-primary">${flavors[0][0].split(' ').slice(0, 2).join(' ')}</span>
-              ` : ''}
-            </div>
-            <div style="display:flex; flex-direction:column; gap:var(--space-3)">
-              ${barChart(flavors.slice(0, 8), maxFlavor, 'var(--color-primary)', 'Aún no hay pedidos')}
-            </div>
-            ${flavors.length > 0 ? `
-              <div class="divider"></div>
-              <div class="d-flex gap-4 text-xs text-muted">
-                <div>
-                  <span class="font-medium text-success">↑ Más pedido:</span>
-                  ${flavors[0]?.[0] || '—'} (${flavors[0]?.[1] || 0} u.)
-                </div>
-                ${flavors.length > 1 ? `
-                  <div>
-                    <span class="font-medium text-secondary">↓ Menos pedido:</span>
-                    ${flavors[flavors.length - 1]?.[0] || '—'} (${flavors[flavors.length - 1]?.[1] || 0} u.)
-                  </div>
-                ` : ''}
-              </div>
-            ` : ''}
-          </div>
-
-          <!-- Zonas de entrega -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Zonas de entrega</div>
-                <div class="card-subtitle">Pedidos por barrio / zona</div>
-              </div>
-              ${zones.length > 0 ? `
-                <span class="badge badge-accent">${zones[0][0].split(' ').slice(0, 2).join(' ')}</span>
-              ` : ''}
-            </div>
-            <div style="display:flex; flex-direction:column; gap:var(--space-3)">
-              ${barChart(zones.slice(0, 8), maxZone, 'var(--color-accent)', 'Sin datos de zona aún')}
-            </div>
-            ${zones.length > 0 ? `
-              <div class="divider"></div>
-              <div class="text-xs text-muted">
-                <span class="font-medium text-primary">Zona principal:</span>
-                ${zones[0][0]} — ${zones[0][1]} pedido${zones[0][1] !== 1 ? 's' : ''}
-              </div>
-            ` : `
-              <div class="form-hint mt-2">
-                Las zonas se completan automáticamente desde los pedidos de Google Sheets o desde la dirección del cliente.
-              </div>
-            `}
-          </div>
-        </div>
+        <!-- Recordatorio de masa -->
+        ${renderMasaReminder()}
 
         <!-- Producción pendiente → Impacto en stock y costos -->
         ${renderStockImpact()}

@@ -150,46 +150,6 @@ const InventoryModule = (() => {
     render(document.getElementById('pageContent'));
   }
 
-  function renderProduccion() {
-    const pending = Store.orders.where(o => o.status === 'pendiente');
-    if (pending.length === 0) return '';
-    const impact  = Store.computeStockImpact(pending);
-    if (impact.length === 0) return '';
-
-    const famCount = pending.reduce((s, o) =>
-      s + (o.items || []).filter(i => (i.format||'').toLowerCase() === 'familiar').reduce((a,i) => a + (i.qty||1), 0), 0);
-    const indCount = pending.reduce((s, o) =>
-      s + (o.items || []).filter(i => (i.format||'').toLowerCase() === 'individual').reduce((a,i) => a + (i.qty||1), 0), 0);
-    const summary  = [famCount && `${famCount} Familiar`, indCount && `${indCount} Individual`].filter(Boolean).join(' · ');
-
-    return `
-      <div class="card" style="margin-bottom:var(--space-6)">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Producción pendiente</div>
-            <div class="card-subtitle">${pending.length} pedido${pending.length!==1?'s':''} · ${summary}</div>
-          </div>
-        </div>
-        <table class="table">
-          <thead><tr><th>Ingrediente</th><th>Necesitás</th><th>Stock actual</th><th>Diferencia</th><th></th></tr></thead>
-          <tbody>
-            ${impact.map(i => `
-              <tr>
-                <td class="font-medium">${i.name}</td>
-                <td class="text-sm">${i.needed} ${i.unit}</td>
-                <td class="text-sm">${i.stock} ${i.unit}</td>
-                <td class="text-sm font-medium" style="color:${i.deficit ? 'var(--color-danger)' : 'var(--color-success)'}">
-                  ${i.after >= 0 ? '+' : ''}${i.after} ${i.unit}
-                </td>
-                <td><span class="badge ${i.deficit ? 'badge-danger' : 'badge-success'}">${i.deficit ? 'Falta' : 'OK'}</span></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
   function render(container) {
     const ingredients = Store.ingredients.all();
     const low = ingredients.filter(i => i.stock <= i.minStock).length;
@@ -207,8 +167,6 @@ const InventoryModule = (() => {
             <span class="text-sm text-danger"><strong>${low} ingrediente${low>1?'s':''}</strong> con stock por debajo del mínimo. Reponer antes de cocinar.</span>
           </div>
         ` : ''}
-
-        ${renderProduccion()}
 
         <div class="table-wrapper">
           <table class="table">

@@ -9,8 +9,9 @@ const Router = (() => {
     inventory: { title: 'Ingredientes', module: () => InventoryModule,  primaryLabel: 'Agregar stock',   primaryRoute: null },
     clients:   { title: 'Clientes',     module: () => ClientsModule,    primaryLabel: 'Nuevo cliente',   primaryRoute: null },
     finances:  { title: 'Finanzas',     module: () => FinancesModule,   primaryLabel: 'Agregar gasto',   primaryRoute: null },
-    produccion: { title: 'Producción',   module: () => ProductionModule, primaryLabel: '',                primaryRoute: null },
-    config:    { title: 'Configuración', module: () => ConfigModule,     primaryLabel: '',                primaryRoute: null },
+    produccion: { title: 'Producción',   module: () => ProductionModule,  primaryLabel: '',              primaryRoute: null },
+    analisis:   { title: 'Análisis',     module: () => AnalyticsModule,  primaryLabel: '',              primaryRoute: null },
+    config:    { title: 'Configuración', module: () => ConfigModule,      primaryLabel: '',              primaryRoute: null },
   };
 
   let current = null;

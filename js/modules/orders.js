@@ -13,7 +13,7 @@ const OrdersModule = (() => {
     return `<span class="badge ${badge}">${label}</span>`;
   }
 
-  let activeFilter = 'all';
+  let activeFilter = 'pendiente';
   let searchQuery = '';
 
   function filteredOrders() {
@@ -296,9 +296,23 @@ const OrdersModule = (() => {
             <div>
               <div class="text-xs text-muted">Cliente</div>
               <div class="font-semibold">${o.clientName}</div>
-              ${o.zone ? `<div class="text-xs text-muted" style="margin-top:2px">${o.zone}</div>` : ''}
+                ${o.zone ? `<div class="text-xs text-muted" style="margin-top:2px">${o.zone}</div>` : ''}
             </div>
             <div class="text-xs text-muted text-right">Pedido ${o.date}</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Barrio -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Zona</label>
+              <input class="form-input" id="dOrderZone" value="${o.zone || ''}" placeholder="Ej: Villa Nueva" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Barrio <span style="color:var(--color-text-muted);font-weight:400">(dentro de la zona)</span></label>
+              <input class="form-input" id="dOrderBarrio" value="${o.barrio || ''}" placeholder="Ej: Los Sauces, Cañuelas…" />
+            </div>
           </div>
 
           <div class="divider"></div>
@@ -370,6 +384,8 @@ const OrdersModule = (() => {
           deliveryTime:  document.getElementById('dOrderDeliveryTime').value,
           paymentMethod: document.getElementById('dOrderPayment').value,
           paid:          document.getElementById('dOrderPaid').value === 'si',
+          zone:          document.getElementById('dOrderZone').value.trim(),
+          barrio:        document.getElementById('dOrderBarrio').value.trim(),
         });
         refreshTable();
         App.toast('success', 'Pedido actualizado');
