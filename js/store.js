@@ -27,7 +27,20 @@ const Store = (() => {
     orders: [],
     expenses: [],
 
-    recipes: [],
+    recipes: [
+      // Masa Familiar (900 g)
+      { id:1,  formatName:'Familiar',   ingredientId:1, qty:472, createdAt:'2026-05-28' },
+      { id:2,  formatName:'Familiar',   ingredientId:2, qty:5,   createdAt:'2026-05-28' },
+      { id:3,  formatName:'Familiar',   ingredientId:3, qty:9,   createdAt:'2026-05-28' },
+      { id:4,  formatName:'Familiar',   ingredientId:4, qty:5,   createdAt:'2026-05-28' },
+      { id:5,  formatName:'Familiar',   ingredientId:5, qty:14,  createdAt:'2026-05-28' },
+      // Masa Individual (280 g)
+      { id:6,  formatName:'Individual', ingredientId:1, qty:147, createdAt:'2026-05-28' },
+      { id:7,  formatName:'Individual', ingredientId:2, qty:2,   createdAt:'2026-05-28' },
+      { id:8,  formatName:'Individual', ingredientId:3, qty:3,   createdAt:'2026-05-28' },
+      { id:9,  formatName:'Individual', ingredientId:4, qty:2,   createdAt:'2026-05-28' },
+      { id:10, formatName:'Individual', ingredientId:5, qty:4,   createdAt:'2026-05-28' },
+    ],
     flavors: [],
     formats: [],
     promos:  [],
@@ -111,24 +124,19 @@ const Store = (() => {
      * Devuelve array ordenado por "after" ascendente (peor situación primero).
      */
     computeStockImpact(orders) {
-      const FORMAT_MOD = {
-        'chica': 0.5, 'pequeña': 0.5, 'mini': 0.5, 'personal': 0.5,
-        'mediana': 0.75,
-        'familiar': 1.0, 'normal': 1.0,
-        'grande': 1.5, 'xl': 1.5, 'extra': 1.5,
-      };
-
-      const recipes     = load('recipes');
-      const needed      = {};   // ingredientId → qty total requerida
+      const recipes = load('recipes');
+      const needed  = {};   // ingredientId → qty total requerida
 
       orders.forEach(order => {
         (order.items || []).forEach(item => {
-          if (!item.productId) return;
-          const modifier    = FORMAT_MOD[(item.format || '').toLowerCase()] || 1.0;
-          const itemRecipes = recipes.filter(r => r.productId === item.productId);
-          itemRecipes.forEach(r => {
-            const qty = r.qty * item.qty * modifier;
-            needed[r.ingredientId] = (needed[r.ingredientId] || 0) + qty;
+          const formatName = (item.format || '').trim();
+          if (!formatName) return;
+          const itemQty    = item.qty || 1;
+          const fmtRecipes = recipes.filter(r =>
+            (r.formatName || '').toLowerCase() === formatName.toLowerCase()
+          );
+          fmtRecipes.forEach(r => {
+            needed[r.ingredientId] = (needed[r.ingredientId] || 0) + r.qty * itemQty;
           });
         });
       });

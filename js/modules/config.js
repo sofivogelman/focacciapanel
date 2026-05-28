@@ -16,11 +16,13 @@ const ConfigModule = (() => {
       </div>
 
       <div id="cfgPromos" style="margin-top:var(--space-6)"></div>
+      <div id="cfgRecipes" style="margin-top:var(--space-6)"></div>
       <div id="cfgPromoStats" style="margin-top:var(--space-6)"></div>
     `;
     renderFlavors();
     renderFormats();
     renderPromos();
+    renderRecipes();
     renderPromoStats();
   }
 
@@ -424,6 +426,133 @@ const ConfigModule = (() => {
     renderPromos();
   }
 
+  // ─── Recetas por formato ─────────────────────────────────────────────────────
+  function renderRecipes() {
+    const el = document.getElementById('cfgRecipes');
+    if (!el) return;
+    const recipes     = Store.recipes.all();
+    const formats     = Store.formats.where(f => f.active);
+    const ingredients = Store.ingredients.all();
+
+    if (formats.length === 0 || ingredients.length === 0) {
+      el.innerHTML = `
+        <div class="card">
+          <div class="card-header"><div class="card-title">Recetas (masa base)</div></div>
+          <p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">
+            Cargá formatos e ingredientes primero.
+          </p>
+        </div>`;
+      return;
+    }
+
+    const byFormat = {};
+    formats.forEach(f => { byFormat[f.name] = []; });
+    recipes.forEach(r => { if (byFormat[r.formatName] !== undefined) byFormat[r.formatName].push(r); });
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Recetas (masa base)</div>
+            <div class="card-subtitle">Cantidad de cada ingrediente por unidad · se usa para calcular producción</div>
+          </div>
+        </div>
+        ${formats.map(fmt => {
+          const rows = byFormat[fmt.name] || [];
+          return `
+            <div style="margin-bottom:var(--space-5)">
+              <div class="d-flex items-center gap-3" style="margin-bottom:var(--space-2)">
+                <span class="font-semibold text-sm">${escHtml(fmt.name)}</span>
+                <button class="btn btn-xs btn-ghost" onclick="ConfigModule.openAddRecipe('${escHtml(fmt.name)}')">+ Ingrediente</button>
+              </div>
+              ${rows.length === 0
+                ? `<p class="text-sm" style="color:var(--color-text-muted);padding-left:var(--space-4)">Sin ingredientes cargados.</p>`
+                : `<table class="table">
+                    <tbody>
+                      ${rows.map(r => {
+                        const ing = ingredients.find(i => i.id === r.ingredientId);
+                        if (!ing) return '';
+                        return `<tr>
+                          <td class="text-sm font-medium">${escHtml(ing.name)}</td>
+                          <td class="text-sm">${r.qty} ${ing.unit}</td>
+                          <td class="cfg-actions">
+                            <button class="btn btn-xs btn-ghost" onclick="ConfigModule.editRecipe(${r.id})">Editar</button>
+                            <button class="btn btn-xs btn-ghost cfg-delete" onclick="ConfigModule.deleteRecipe(${r.id})">✕</button>
+                          </td>
+                        </tr>`;
+                      }).join('')}
+                    </tbody>
+                  </table>`
+              }
+            </div>`;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function openAddRecipe(formatName) {
+    const ingredients = Store.ingredients.all();
+    if (!ingredients.length) { App.toast('error', 'Cargá ingredientes primero'); return; }
+    App.openModal({
+      title: `Agregar ingrediente — ${formatName}`,
+      body: `
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ingrediente *</label>
+            <select class="form-select" id="fRecipeIng">
+              ${ingredients.map(i => `<option value="${i.id}">${escHtml(i.name)} (${i.unit})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cantidad por unidad *</label>
+            <input class="form-input" id="fRecipeQty" type="number" min="0" step="0.1" placeholder="ej: 472" autofocus />
+          </div>
+        </div>
+      `,
+      primaryLabel: 'Agregar',
+      onConfirm: () => {
+        const ingId = parseInt(document.getElementById('fRecipeIng').value);
+        const qty   = parseFloat(document.getElementById('fRecipeQty').value);
+        if (!ingId || isNaN(qty) || qty <= 0) { App.toast('error', 'Completá los campos'); return false; }
+        Store.recipes.create({ formatName, ingredientId: ingId, qty });
+        renderRecipes();
+        return true;
+      },
+    });
+  }
+
+  function editRecipe(id) {
+    const r   = Store.recipes.find(id);
+    if (!r) return;
+    const ing = Store.ingredients.find(r.ingredientId);
+    App.openModal({
+      title: `Editar — ${r.formatName}`,
+      body: `
+        <div class="form-group">
+          <label class="form-label">${ing ? escHtml(ing.name) : 'Ingrediente'}</label>
+          <div class="d-flex gap-2 items-center">
+            <input class="form-input" id="fRecipeQty" type="number" min="0" step="0.1" value="${r.qty}" autofocus />
+            <span class="text-sm" style="color:var(--color-text-muted);white-space:nowrap">${ing?.unit || ''} por unidad</span>
+          </div>
+        </div>
+      `,
+      primaryLabel: 'Guardar',
+      onConfirm: () => {
+        const qty = parseFloat(document.getElementById('fRecipeQty').value);
+        if (isNaN(qty) || qty <= 0) return false;
+        Store.recipes.update(id, { qty });
+        renderRecipes();
+        return true;
+      },
+    });
+  }
+
+  function deleteRecipe(id) {
+    if (!confirm('¿Eliminar este ingrediente de la receta?')) return;
+    Store.recipes.remove(id);
+    renderRecipes();
+  }
+
   // ─── Helpers para sync.js ────────────────────────────────────────────────────
   // Busca si un texto de sabor coincide con un sabor configurado.
   function resolveFlavor(text) {
@@ -563,6 +692,7 @@ const ConfigModule = (() => {
     openAddFlavor, editFlavor, toggleFlavor, deleteFlavor,
     openAddFormat, editFormat, toggleFormat, deleteFormat,
     openAddPromo,  editPromo,  togglePromo,  deletePromo, addPromoItemRow,
+    openAddRecipe, editRecipe, deleteRecipe,
     resolveFlavor, resolvePromo,
   };
 })();
