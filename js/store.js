@@ -9,7 +9,21 @@ const Store = (() => {
   const SEEDS = {
     products: [],
     clients: [],
-    ingredients: [],
+    ingredients: [
+      // Masa base
+      { id:1,  name:'Harina de fuerza Chacabuco', category:'base',       unit:'g',  cost:0, stock:0, minStock:500, createdAt:'2026-05-28' },
+      { id:2,  name:'Levadura seca',              category:'base',       unit:'g',  cost:0, stock:0, minStock:20,  createdAt:'2026-05-28' },
+      { id:3,  name:'Sal',                        category:'condimento', unit:'g',  cost:0, stock:0, minStock:200, createdAt:'2026-05-28' },
+      { id:4,  name:'Azúcar',                     category:'condimento', unit:'g',  cost:0, stock:0, minStock:100, createdAt:'2026-05-28' },
+      { id:5,  name:'Aceite',                     category:'condimento', unit:'ml', cost:0, stock:0, minStock:500, createdAt:'2026-05-28' },
+      // Toppings
+      { id:6,  name:'Tomates cherry',             category:'topping',    unit:'g',  cost:0, stock:0, minStock:300, createdAt:'2026-05-28' },
+      { id:7,  name:'Pesto',                      category:'topping',    unit:'g',  cost:0, stock:0, minStock:150, createdAt:'2026-05-28' },
+      { id:8,  name:'Queso parmesano',            category:'topping',    unit:'g',  cost:0, stock:0, minStock:150, createdAt:'2026-05-28' },
+      { id:9,  name:'Papa',                       category:'topping',    unit:'g',  cost:0, stock:0, minStock:500, createdAt:'2026-05-28' },
+      { id:10, name:'Romero seco',                category:'hierba',     unit:'g',  cost:0, stock:0, minStock:30,  createdAt:'2026-05-28' },
+      { id:11, name:'Aceitunas en rodajas',       category:'topping',    unit:'g',  cost:0, stock:0, minStock:150, createdAt:'2026-05-28' },
+    ],
     orders: [],
     expenses: [],
 

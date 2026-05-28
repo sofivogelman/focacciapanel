@@ -179,7 +179,7 @@ const Sync = (() => {
       total,
       paymentMethod: 'indefinido',
       paid:          false,
-      notes:         row.notes || '',
+      notes:         [row.dia, row.notes].filter(Boolean).join(' · ') || '',
       zone:          row.zone  || '',
       fromGAS:       true,
       gasTimestamp:  row.timestamp || '',
@@ -207,7 +207,18 @@ const Sync = (() => {
       // Refrescar set de conocidos (puede haber cambiado por ediciones manuales)
       buildKnownSet();
 
-      const newRows = rows.filter(r => r.timestamp && !knownTimestamps.has(r.timestamp));
+      const newRows = rows.filter(r => {
+        if (!r.timestamp) return false;
+        if (knownTimestamps.has(r.timestamp)) return false;
+        // Dedup secundario: cubre cambios de formato de timestamp entre versiones de GAS.
+        // Si ya existe un pedido de GAS con la misma fecha, cliente y total → es el mismo pedido.
+        return Store.orders.where(o =>
+          o.fromGAS &&
+          o.date === r.date &&
+          (o.clientName || '').toLowerCase() === (r.client || '').toLowerCase() &&
+          (r.total === 0 || Math.abs((o.total || 0) - r.total) < 1)
+        ).length === 0;
+      });
 
       if (newRows.length > 0) {
         // Importar cada pedido nuevo al Store
