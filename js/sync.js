@@ -114,11 +114,20 @@ const Sync = (() => {
     // 2. Convertir [{qty, format, flavor}] → store items [{productId, name, qty, price, format, flavor}]
     const gasItems   = Array.isArray(row.items) ? row.items : [];
     const storeItems = gasItems.map(gi => {
+      // Si el formato viene vacío (regex vieja en GAS), intentar extraerlo del sabor
+      let format = gi.format || '';
+      let flavor = gi.flavor || '';
+      if (!format && flavor) {
+        const activeFormats = Store.formats.where(f => f.active);
+        const found = activeFormats.find(f => flavor.toLowerCase().startsWith(f.name.toLowerCase() + ' '));
+        if (found) { format = found.name; flavor = flavor.slice(found.name.length).replace(/^\s*\(|\)\s*$/g, '').trim(); }
+      }
+
       // Buscar precio: promo configurada > formato configurado > producto > 0
-      const cfgPromo  = typeof ConfigModule !== 'undefined' ? ConfigModule.resolvePromo(gi.flavor) : null;
-      const cfgFormat = Store.formats.where(f => f.active && f.name.toLowerCase() === (gi.format || '').toLowerCase())[0];
-      const product   = matchProduct(gi.flavor);
-      const modifier  = formatModifier(gi.format);
+      const cfgPromo  = typeof ConfigModule !== 'undefined' ? ConfigModule.resolvePromo(flavor) : null;
+      const cfgFormat = Store.formats.where(f => f.active && f.name.toLowerCase() === format.toLowerCase())[0];
+      const product   = matchProduct(flavor);
+      const modifier  = formatModifier(format);
 
       let price = 0;
       if (cfgPromo?.promo?.price)  price = cfgPromo.promo.price;
@@ -127,11 +136,11 @@ const Sync = (() => {
 
       return {
         productId: product?.id || null,
-        name:      buildItemName(gi),
+        name:      buildItemName({ format, flavor }),
         qty:       Math.max(1, gi.qty || 1),
         price,
-        format:    gi.format || '',
-        flavor:    gi.flavor || '',
+        format,
+        flavor,
       };
     });
 
