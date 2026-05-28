@@ -162,7 +162,7 @@ const Sync = (() => {
       return null;
     }
     const orderDate = toISODate(row.date)
-      || (row.timestamp ? row.timestamp.slice(0, 10) : null)
+      || toISODate(row.timestamp)
       || new Date().toISOString().slice(0, 10);
     const delivDate = new Date(new Date(orderDate + 'T12:00:00').getTime() + 2 * 864e5)
       .toISOString().slice(0, 10);
