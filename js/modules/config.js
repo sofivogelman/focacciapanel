@@ -16,10 +16,12 @@ const ConfigModule = (() => {
       </div>
 
       <div id="cfgPromos" style="margin-top:var(--space-6)"></div>
+      <div id="cfgPromoStats" style="margin-top:var(--space-6)"></div>
     `;
     renderFlavors();
     renderFormats();
     renderPromos();
+    renderPromoStats();
   }
 
   // ─── Sabores ─────────────────────────────────────────────────────────────────
@@ -239,10 +241,11 @@ const ConfigModule = (() => {
           : `<table class="table">
               <thead>
                 <tr>
-                  <th>Nombre de la promo</th>
+                  <th>Semana</th>
+                  <th>Nombre en pedido</th>
+                  <th>Tipo</th>
+                  <th>Contenido</th>
                   <th>Precio</th>
-                  <th>Sabores que incluye</th>
-                  <th>Notas</th>
                   <th>Estado</th>
                   <th></th>
                 </tr>
@@ -250,15 +253,16 @@ const ConfigModule = (() => {
               <tbody>
                 ${items.map(p => `
                   <tr>
+                    <td class="text-sm" style="color:var(--color-text-muted);white-space:nowrap">${p.semana ? fmtWeek(p.semana) : '—'}</td>
                     <td class="font-medium">${escHtml(p.name)}</td>
-                    <td class="text-sm">${p.price ? '$' + Number(p.price).toLocaleString('es-AR') : '<span style="color:var(--color-text-muted)">—</span>'}</td>
+                    <td class="text-sm">${p.tipo ? `<span class="badge badge-primary">${escHtml(p.tipo)}</span>` : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                     <td class="text-sm" style="color:var(--color-text-secondary)">
-                      ${(p.flavors || []).length > 0
-                        ? p.flavors.map(f => `<span class="badge badge-primary" style="margin-right:2px;margin-bottom:2px">${escHtml(f)}</span>`).join('')
+                      ${(p.items || []).length > 0
+                        ? p.items.map(i => `${i.qty}× ${escHtml(i.format)}`).join(', ')
                         : '<span style="color:var(--color-text-muted)">—</span>'
                       }
                     </td>
-                    <td class="text-sm" style="color:var(--color-text-muted)">${escHtml(p.notes || '—')}</td>
+                    <td class="text-sm">${p.price ? '$' + Number(p.price).toLocaleString('es-AR') : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                     <td><span class="badge ${p.active ? 'badge-success' : 'badge-default'}">${p.active ? 'Activa' : 'Inactiva'}</span></td>
                     <td class="cfg-actions">
                       <button class="btn btn-xs btn-ghost" onclick="ConfigModule.editPromo(${p.id})">Editar</button>
@@ -275,42 +279,92 @@ const ConfigModule = (() => {
   }
 
   function promoModalBody(p) {
-    const flavors = Store.flavors.where(f => f.active);
-    const selected = p?.flavors || [];
+    const formats = Store.formats.where(f => f.active);
+    const existingItems = p?.items || [];
+    const formatOptions = formats.map(f =>
+      `<option value="${escHtml(f.name)}">${escHtml(f.name)}</option>`
+    ).join('');
+
+    const itemRows = existingItems.length > 0
+      ? existingItems.map(i => promoItemRow(i.format, i.qty, formatOptions)).join('')
+      : promoItemRow('', 1, formatOptions);
+
     return `
-      <div class="form-group">
-        <label class="form-label">Nombre de la promo *</label>
-        <input class="form-input" id="fPromoName" value="${escHtml(p?.name || '')}"
-          placeholder="ej: Promo (Los 4 sabores)" />
-        <div class="form-hint">Escribilo igual que aparece en la columna G de tus pedidos.</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Sabores incluidos</label>
-        ${flavors.length === 0
-          ? '<p class="text-sm" style="color:var(--color-text-muted)">Primero cargá sabores en la sección de arriba.</p>'
-          : `<div class="checkbox-grid">
-              ${flavors.map(f => `
-                <label class="checkbox-item">
-                  <input type="checkbox" value="${escHtml(f.name)}" ${selected.includes(f.name) ? 'checked' : ''} />
-                  <span>${escHtml(f.name)}</span>
-                </label>
-              `).join('')}
-            </div>`
-        }
-      </div>
       <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombre en el pedido *</label>
+          <input class="form-input" id="fPromoName" value="${escHtml(p?.name || '')}"
+            placeholder="ej: Promo25" />
+          <div class="form-hint">Igual que aparece en la columna G de tus pedidos.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo (para agrupar) *</label>
+          <input class="form-input" id="fPromoTipo" value="${escHtml(p?.tipo || '')}"
+            placeholder="ej: 4 individuales" />
+          <div class="form-hint">Agrupa promos del mismo concepto entre semanas.</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Contenido del combo</label>
+        <div id="fPromoItems" style="display:flex;flex-direction:column;gap:var(--space-2)">
+          ${formats.length === 0
+            ? '<p class="text-sm" style="color:var(--color-text-muted)">Configurá formatos primero.</p>'
+            : itemRows
+          }
+        </div>
+        ${formats.length > 0 ? `<button type="button" class="btn btn-secondary btn-sm" style="margin-top:var(--space-2)"
+          onclick="ConfigModule.addPromoItemRow()">+ Agregar formato</button>` : ''}
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Semana</label>
+          <input class="form-input" id="fPromoSemana" type="date" value="${p?.semana || ''}" />
+        </div>
         <div class="form-group">
           <label class="form-label">Precio ($)</label>
           <input class="form-input" id="fPromoPrice" type="number" min="0"
             value="${p?.price || ''}" placeholder="ej: 4000" />
         </div>
-        <div class="form-group">
-          <label class="form-label">Notas</label>
-          <input class="form-input" id="fPromoNotes" value="${escHtml(p?.notes || '')}"
-            placeholder="ej: Válida solo los sábados" />
-        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas</label>
+        <input class="form-input" id="fPromoNotes" value="${escHtml(p?.notes || '')}"
+          placeholder="ej: Válida solo los sábados" />
       </div>
     `;
+  }
+
+  function promoItemRow(format, qty, formatOptions) {
+    return `
+      <div class="d-flex gap-2 items-center promo-item-row">
+        <select class="form-select flex-1" style="height:34px">
+          ${Store.formats.where(f => f.active).map(f =>
+            `<option value="${escHtml(f.name)}" ${f.name === format ? 'selected' : ''}>${escHtml(f.name)}</option>`
+          ).join('')}
+        </select>
+        <input type="number" class="form-input" min="1" value="${qty || 1}" style="width:72px" placeholder="cant." />
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="this.parentElement.remove()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    `;
+  }
+
+  function addPromoItemRow() {
+    const container = document.getElementById('fPromoItems');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.innerHTML = promoItemRow('', 1, '');
+    container.appendChild(div.firstElementChild);
+  }
+
+  function readPromoItems() {
+    return [...document.querySelectorAll('.promo-item-row')].map(row => ({
+      format: row.querySelector('select')?.value || '',
+      qty:    parseInt(row.querySelector('input')?.value) || 1,
+    })).filter(i => i.format);
   }
 
   function openAddPromo() {
@@ -322,10 +376,12 @@ const ConfigModule = (() => {
       onConfirm: () => {
         const name  = document.getElementById('fPromoName').value.trim();
         if (!name) { App.toast('error', 'Ingresá el nombre de la promo'); return false; }
-        const price   = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
-        const flavors = [...document.querySelectorAll('.checkbox-item input:checked')].map(cb => cb.value);
-        const notes   = (document.getElementById('fPromoNotes')?.value || '').trim();
-        Store.promos.create({ name, price, flavors, notes, active: true });
+        const tipo   = document.getElementById('fPromoTipo').value.trim();
+        const price  = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
+        const semana = document.getElementById('fPromoSemana')?.value || '';
+        const items  = readPromoItems();
+        const notes  = (document.getElementById('fPromoNotes')?.value || '').trim();
+        Store.promos.create({ name, tipo, price, semana, items, notes, active: true });
         renderPromos();
         return true;
       },
@@ -343,10 +399,12 @@ const ConfigModule = (() => {
       onConfirm: () => {
         const name  = document.getElementById('fPromoName').value.trim();
         if (!name) return false;
-        const price   = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
-        const flavors = [...document.querySelectorAll('.checkbox-item input:checked')].map(cb => cb.value);
-        const notes   = (document.getElementById('fPromoNotes')?.value || '').trim();
-        Store.promos.update(id, { name, price, flavors, notes });
+        const tipo   = document.getElementById('fPromoTipo').value.trim();
+        const price  = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
+        const semana = document.getElementById('fPromoSemana')?.value || '';
+        const items  = readPromoItems();
+        const notes  = (document.getElementById('fPromoNotes')?.value || '').trim();
+        Store.promos.update(id, { name, tipo, price, semana, items, notes });
         renderPromos();
         return true;
       },
@@ -393,7 +451,109 @@ const ConfigModule = (() => {
     return { promo: match, flavors: match.flavors || [] };
   }
 
+  // ─── Métricas históricas de promos ───────────────────────────────────────────
+  function computePromoStats() {
+    const orders = Store.orders.all();
+    // Agrupar promos por tipo
+    const tipoMap = {};
+    Store.promos.all().forEach(promo => {
+      const key = (promo.tipo || promo.name).toLowerCase();
+      if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, semanas: [] };
+
+      let pool = orders;
+      if (promo.semana) {
+        const start = new Date(promo.semana + 'T00:00:00').getTime();
+        const end   = start + 7 * 86400000;
+        pool = orders.filter(o => {
+          const t = new Date((o.date || '').slice(0,10) + 'T00:00:00').getTime();
+          return t >= start && t < end;
+        });
+      }
+
+      const promoLow = promo.name.toLowerCase();
+      let orderCount = 0, revenue = 0;
+      const formatCounts = {};
+
+      pool.forEach(order => {
+        const matching = (order.items || []).filter(item =>
+          (item.flavor || item.name || '').toLowerCase().includes(promoLow)
+        );
+        if (matching.length > 0) {
+          orderCount++;
+          revenue += order.total || 0;
+        }
+      });
+
+      // Contar unidades por formato del contenido definido
+      (promo.items || []).forEach(pi => {
+        formatCounts[pi.format] = (formatCounts[pi.format] || 0) + pi.qty * orderCount;
+      });
+
+      tipoMap[key].semanas.push({ promo, orderCount, revenue, formatCounts });
+    });
+
+    return Object.values(tipoMap).map(group => {
+      const totalOrders  = group.semanas.reduce((s, w) => s + w.orderCount, 0);
+      const totalRevenue = group.semanas.reduce((s, w) => s + w.revenue, 0);
+      const allFormats   = {};
+      group.semanas.forEach(w => {
+        Object.entries(w.formatCounts).forEach(([fmt, qty]) => {
+          allFormats[fmt] = (allFormats[fmt] || 0) + qty;
+        });
+      });
+      return { tipo: group.tipo, semanas: group.semanas, totalOrders, totalRevenue, allFormats };
+    }).sort((a, b) => b.totalOrders - a.totalOrders);
+  }
+
+  function renderPromoStats() {
+    const el = document.getElementById('cfgPromoStats');
+    if (!el) return;
+    const stats = computePromoStats().filter(s => s.semanas.length > 0);
+    if (stats.length === 0) { el.innerHTML = ''; return; }
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Comparativa de Promos</div>
+            <div class="card-subtitle">Agrupado por tipo · ordenado por pedidos</div>
+          </div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr><th>Tipo</th><th>Contenido</th><th>Semanas</th><th>Pedidos</th><th>Revenue</th><th>Desglose por semana</th></tr>
+          </thead>
+          <tbody>
+            ${stats.map(g => `
+              <tr>
+                <td class="font-medium">${escHtml(g.tipo)}</td>
+                <td class="text-sm" style="color:var(--color-text-secondary)">
+                  ${Object.entries(g.allFormats).map(([fmt, qty]) => `${qty}× ${escHtml(fmt)}`).join(', ') || '—'}
+                </td>
+                <td class="text-sm">${g.semanas.length}</td>
+                <td class="font-semibold">${g.totalOrders}</td>
+                <td class="text-sm">${g.totalRevenue ? '$' + g.totalRevenue.toLocaleString('es-AR') : '—'}</td>
+                <td class="text-xs" style="color:var(--color-text-muted)">
+                  ${g.semanas.filter(w => w.orderCount > 0).map(w =>
+                    `${w.promo.semana ? fmtWeek(w.promo.semana) : '?'}: ${w.orderCount} ped.`
+                  ).join(' · ') || '—'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   // ─── Util ────────────────────────────────────────────────────────────────────
+  function fmtWeek(dateStr) {
+    if (!dateStr) return '—';
+    try {
+      return new Date(dateStr + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    } catch { return dateStr; }
+  }
+
   function escHtml(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
@@ -402,7 +562,7 @@ const ConfigModule = (() => {
     render,
     openAddFlavor, editFlavor, toggleFlavor, deleteFlavor,
     openAddFormat, editFormat, toggleFormat, deleteFormat,
-    openAddPromo,  editPromo,  togglePromo,  deletePromo,
+    openAddPromo,  editPromo,  togglePromo,  deletePromo, addPromoItemRow,
     resolveFlavor, resolvePromo,
   };
 })();
