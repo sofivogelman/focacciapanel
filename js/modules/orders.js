@@ -159,34 +159,52 @@ const OrdersModule = (() => {
     const container = document.getElementById('orderItemsContainer');
     const totalEl   = document.getElementById('orderTotal');
     const hiddenEl  = document.getElementById('fOrderItems');
-    const products  = Store.products.where(p => p.active);
-    let items = [...existingItems];
 
-    function productOptions(selectedId) {
-      return products.map(p =>
-        `<option value="${p.id}" data-price="${p.price}" ${p.id === selectedId ? 'selected' : ''}>${p.name} — $${p.price.toLocaleString('es-AR')}</option>`
+    // Catálogo derivado de config: formato × sabor + promos
+    const formats = Store.formats.where(f => f.active);
+    const flavors = Store.flavors.where(f => f.active);
+    const promos  = Store.promos.where(p => p.active);
+    const catalog = [];
+    formats.forEach(fmt => {
+      flavors.forEach(flv => {
+        catalog.push({ key: `f${fmt.id}v${flv.id}`, name: `${fmt.name} — ${flv.name}`, price: fmt.price || 0, format: fmt.name, flavor: flv.name });
+      });
+    });
+    promos.forEach(p => {
+      catalog.push({ key: `promo${p.id}`, name: p.name, price: p.price || 0, format: 'Promo', flavor: p.name });
+    });
+
+    function findKey(item) {
+      if (!item) return '';
+      const fmtLow = (item.format || '').toLowerCase();
+      const flvLow = (item.flavor || item.name || '').toLowerCase();
+      return (
+        catalog.find(c => c.format.toLowerCase() === fmtLow && c.flavor.toLowerCase() === flvLow) ||
+        catalog.find(c => flvLow && c.flavor.toLowerCase().includes(flvLow.slice(0, 8)))
+      )?.key || '';
+    }
+
+    function productOptions(selectedKey) {
+      if (catalog.length === 0) return '<option value="">— Configurá sabores y formatos primero —</option>';
+      return catalog.map(c =>
+        `<option value="${c.key}" data-price="${c.price}" data-format="${c.format}" data-flavor="${c.flavor}" ${c.key === selectedKey ? 'selected' : ''}>${c.name}${c.price ? ' — $' + c.price.toLocaleString('es-AR') : ''}</option>`
       ).join('');
     }
 
     function recalc() {
       let total = 0;
-      container.querySelectorAll('.order-item-row').forEach(row => {
-        const sel = row.querySelector('select');
-        const qty = parseFloat(row.querySelector('input').value) || 0;
-        const opt = sel.options[sel.selectedIndex];
-        const price = parseFloat(opt?.dataset.price || 0);
-        total += qty * price;
-      });
-      totalEl.textContent = '$' + total.toLocaleString('es-AR');
-      // Sync hidden
       const rows = [];
       container.querySelectorAll('.order-item-row').forEach(row => {
-        const sel = row.querySelector('select');
-        const qty = parseFloat(row.querySelector('input').value) || 0;
-        const productId = parseInt(sel.value);
-        const product = products.find(p => p.id === productId);
-        if (product && qty > 0) rows.push({ productId, name: product.name, qty, price: product.price });
+        const sel   = row.querySelector('select');
+        const qty   = parseFloat(row.querySelector('input').value) || 0;
+        const opt   = sel.options[sel.selectedIndex];
+        const price = parseFloat(opt?.dataset.price || 0);
+        total += qty * price;
+        if (opt?.value && qty > 0) {
+          rows.push({ productId: null, name: opt.text.split(' — ')[0], qty, price, format: opt.dataset.format || '', flavor: opt.dataset.flavor || '' });
+        }
       });
+      totalEl.textContent = '$' + total.toLocaleString('es-AR');
       hiddenEl.value = JSON.stringify(rows);
     }
 
@@ -195,10 +213,10 @@ const OrdersModule = (() => {
       row.className = 'order-item-row d-flex gap-2 items-center';
       row.innerHTML = `
         <select class="form-select flex-1" style="height:36px">
-          ${productOptions(item?.productId || null)}
+          ${productOptions(item ? findKey(item) : '')}
         </select>
-        <input type="number" class="form-input" min="1" value="${item?.qty || 1}" style="width: 72px;" />
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="this.parentElement.remove(); recalcOrder()">
+        <input type="number" class="form-input" min="1" value="${item?.qty || 1}" style="width:72px" />
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" onclick="this.parentElement.remove();window.recalcOrder()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       `;
@@ -208,12 +226,9 @@ const OrdersModule = (() => {
       recalc();
     }
 
-    // Expose for button onclick
     window.recalcOrder = recalc;
-
-    items.forEach(i => addRow(i));
-    if (items.length === 0) addRow();
-
+    existingItems.forEach(i => addRow(i));
+    if (existingItems.length === 0) addRow();
     document.getElementById('addItemBtn').onclick = () => addRow();
   }
 
