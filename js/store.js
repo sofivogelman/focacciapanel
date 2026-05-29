@@ -44,7 +44,8 @@ const Store = (() => {
     flavors:  [],
     formats:  [],
     promos:   [],
-    masaLog:  [],
+    masaLog:   [],
+    deliveries: [],
     barriosVN: [
       { id: 1, name: 'San Marco', createdAt: '2026-05-28' },
     ],
@@ -118,6 +119,7 @@ const Store = (() => {
     formats:     collection('formats'),
     promos:      collection('promos'),
     masaLog:     collection('masaLog'),
+    deliveries:  collection('deliveries'),
     barriosVN:   collection('barriosVN'),
 
     /**
