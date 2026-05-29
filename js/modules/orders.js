@@ -309,7 +309,7 @@ const OrdersModule = (() => {
               <label class="form-label">Zona de entrega</label>
               <select class="form-select" id="dOrderZone">
                 <option value="">Sin zona</option>
-                ${['Barrio de Villa Nueva','Vila Terra','Centro Comercial Nordelta','Lirios del Talar','Terrazas/Casas de Santa Maria','Otro'].map(z =>
+                ${['Barrio de Villa Nueva','Vila Terra','Centro Comercial Nordelta','Lirios del Talar','Terrazas/Casas de Santa Maria','Talar del lago 2','Otro'].map(z =>
                   `<option value="${z}" ${o.zone === z ? 'selected' : ''}>${z}</option>`
                 ).join('')}
               </select>

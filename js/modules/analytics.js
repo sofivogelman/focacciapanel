@@ -39,6 +39,7 @@ const AnalyticsModule = (() => {
     'Centro Comercial Nordelta',
     'Lirios del Talar',
     'Terrazas/Casas de Santa Maria',
+    'Talar del lago 2',
     'Otro',
   ];
 
@@ -54,6 +55,7 @@ const AnalyticsModule = (() => {
     if (zl.includes('nordelta'))                          return 'Centro Comercial Nordelta';
     if (zl.includes('lirios'))                            return 'Lirios del Talar';
     if (zl.includes('santa maria') || zl.includes('terraza') || zl.includes('santa maría')) return 'Terrazas/Casas de Santa Maria';
+    if (zl.includes('talar del lago'))                    return 'Talar del lago 2';
     return 'Otro';
   }
 
@@ -142,17 +144,15 @@ const AnalyticsModule = (() => {
       const name = (o.clientName || '').trim();
       if (!name) return;
       const zone = normalizeZone(o.zone) || '';
+      const barrio = (o.barrio || '').trim() || extractBarrioFromZone(o.zone) || '';
       const k = name + '||' + zone;
-      if (!clientMap[k]) clientMap[k] = { name, zone, count: 0 };
+      if (!clientMap[k]) clientMap[k] = { name, barrio, zone, count: 0 };
       clientMap[k].count++;
     });
-    // Si hay dos clientes con el mismo nombre en distintas zonas, mostrar zona
-    const nameFreq = {};
-    Object.values(clientMap).forEach(c => { nameFreq[c.name] = (nameFreq[c.name] || 0) + 1; });
     const repeated = Object.values(clientMap)
       .filter(c => c.count > 1)
       .sort((a, b) => b.count - a.count)
-      .map(c => [nameFreq[c.name] > 1 ? `${c.name} — ${c.zone || 'sin zona'}` : c.name, c.count]);
+      .map(c => [`${c.name} — ${c.barrio || c.zone || 'sin zona'}`, c.count]);
 
     return { flavors, zones, barrios, repeated, total: orders.length };
   }
