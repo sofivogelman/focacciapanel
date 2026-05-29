@@ -320,6 +320,8 @@ const OrdersModule = (() => {
   function openDetail(id) {
     const o = Store.orders.find(id);
     if (!o) return;
+    const _loteMatch  = (o.zone || '').match(/lote\s*(\d+)/i);
+    const loteDefault = o.lote || (_loteMatch ? _loteMatch[1] : '');
     App.openModal({
       title: `Pedido #${o.id}`,
       body: `
@@ -359,11 +361,7 @@ const OrdersModule = (() => {
           </div>
           <div class="form-group" style="max-width:180px">
             <label class="form-label">Lote <span style="color:var(--color-text-muted);font-weight:400">(opcional)</span></label>
-            <input type="text" class="form-input" id="dOrderLote" placeholder="Ej: 257" value="${(() => {
-              if (o.lote) return o.lote;
-              const m = (o.zone || '').match(/lote\\s*(\\d+)/i);
-              return m ? m[1] : '';
-            })()" />
+            <input type="text" class="form-input" id="dOrderLote" placeholder="Ej: 257" value="${loteDefault}" />
           </div>
 
           <div class="divider"></div>
