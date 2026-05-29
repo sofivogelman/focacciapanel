@@ -138,16 +138,17 @@ const AnalyticsModule = (() => {
     });
     const barrios = knownBarrios.map(b => [b.name, b.id, barrioOrderMap[b.name] || 0]);
 
-    // Clientes repetidos — clave nombre+zona para no confundir homónimos
+    // Clientes repetidos — clave por nombre; zona/barrio se toma del primer pedido que lo tenga
     const clientMap = {};
     orders.forEach(o => {
       const name = (o.clientName || '').trim();
       if (!name) return;
-      const zone = normalizeZone(o.zone) || '';
+      const zone   = normalizeZone(o.zone) || '';
       const barrio = (o.barrio || '').trim() || extractBarrioFromZone(o.zone) || '';
-      const k = name + '||' + zone;
-      if (!clientMap[k]) clientMap[k] = { name, barrio, zone, count: 0 };
-      clientMap[k].count++;
+      if (!clientMap[name]) clientMap[name] = { name, barrio: '', zone: '', count: 0 };
+      clientMap[name].count++;
+      if (!clientMap[name].barrio && barrio) clientMap[name].barrio = barrio;
+      if (!clientMap[name].zone  && zone)   clientMap[name].zone   = zone;
     });
     const repeated = Object.values(clientMap)
       .filter(c => c.count > 1)
