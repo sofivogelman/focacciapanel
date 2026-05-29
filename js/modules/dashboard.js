@@ -22,7 +22,7 @@ const DashboardModule = (() => {
 
     function tieneRegalo(flavor) {
       const f = (flavor || '').toLowerCase();
-      return f.includes('regalo') && !f.includes('sin individual');
+      return f.includes('regalo') && !f.includes('sin individual') && !f.includes('romero');
     }
 
     const pending = Store.orders.where(o => o.status === 'pendiente');

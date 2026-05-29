@@ -303,15 +303,25 @@ const OrdersModule = (() => {
 
           <div class="divider"></div>
 
-          <!-- Barrio -->
+          <!-- Zona / Barrio -->
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Zona</label>
-              <input class="form-input" id="dOrderZone" value="${o.zone || ''}" placeholder="Ej: Villa Nueva" />
+              <label class="form-label">Zona de entrega</label>
+              <select class="form-select" id="dOrderZone">
+                <option value="">Sin zona</option>
+                ${['Barrio de Villa Nueva','Vila Terra','Centro Comercial Nordelta','Lirios del Talar','Terrazas/Casas de Santa Maria','Otro'].map(z =>
+                  `<option value="${z}" ${o.zone === z ? 'selected' : ''}>${z}</option>`
+                ).join('')}
+              </select>
             </div>
             <div class="form-group">
-              <label class="form-label">Barrio <span style="color:var(--color-text-muted);font-weight:400">(dentro de la zona)</span></label>
-              <input class="form-input" id="dOrderBarrio" value="${o.barrio || ''}" placeholder="Ej: Los Sauces, Cañuelas…" />
+              <label class="form-label">Barrio <span style="color:var(--color-text-muted);font-weight:400">(Villa Nueva)</span></label>
+              <select class="form-select" id="dOrderBarrio">
+                <option value="">Sin barrio</option>
+                ${Store.barriosVN.all().map(b =>
+                  `<option value="${b.name}" ${o.barrio === b.name ? 'selected' : ''}>${b.name}</option>`
+                ).join('')}
+              </select>
             </div>
           </div>
 

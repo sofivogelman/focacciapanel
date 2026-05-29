@@ -1,53 +1,110 @@
 const AnalyticsModule = (() => {
 
-  function barChart(entries, maxVal, colorVar, emptyMsg) {
-    if (entries.length === 0) {
-      return `<div class="empty-state" style="padding:var(--space-6)"><div class="empty-state-title">${emptyMsg}</div></div>`;
-    }
+  // ─── Sabores canónicos ────────────────────────────────────────────────────────
+  const FLAVORS_FIXED = [
+    'Romero y Sal',
+    'Papa y Parmesano',
+    'Tomate Cherry y Pesto',
+    'Aceitunas',
+  ];
+
+  function canonicalFlavor(s) {
+    const f = (s || '').toLowerCase();
+    if (f.includes('romero'))                                              return 'Romero y Sal';
+    if (f.includes('papa') || f.includes('parmesano'))                    return 'Papa y Parmesano';
+    if (f.includes('tomate') || f.includes('cherry') || f.includes('pesto')) return 'Tomate Cherry y Pesto';
+    if (f.includes('aceitun'))                                             return 'Aceitunas';
+    return null;
+  }
+
+  function isDegustacion(item) {
+    const s = ((item.flavor || '') + ' ' + (item.name || '')).toLowerCase();
+    return s.includes('degustac');
+  }
+
+  // ─── Zonas fijas ──────────────────────────────────────────────────────────────
+  const ZONES_FIXED = [
+    'Barrio de Villa Nueva',
+    'Vila Terra',
+    'Centro Comercial Nordelta',
+    'Lirios del Talar',
+    'Terrazas/Casas de Santa Maria',
+    'Otro',
+  ];
+
+  function normalizeZone(zone) {
+    const z = (zone || '').trim();
+    if (!z) return null;
+    // Exact match first (when zone was set from the select)
+    if (ZONES_FIXED.includes(z)) return z;
+    // Fuzzy fallback for GAS free-text values
+    const zl = z.toLowerCase();
+    if (zl.includes('villa nueva'))                       return 'Barrio de Villa Nueva';
+    if (zl.includes('terra') || zl.includes('vila'))      return 'Vila Terra';
+    if (zl.includes('nordelta'))                          return 'Centro Comercial Nordelta';
+    if (zl.includes('lirios'))                            return 'Lirios del Talar';
+    if (zl.includes('santa maria') || zl.includes('terraza') || zl.includes('santa maría')) return 'Terrazas/Casas de Santa Maria';
+    return 'Otro';
+  }
+
+  // ─── Gráfico de barras ────────────────────────────────────────────────────────
+  function barChart(entries, maxVal, colorVar) {
     return entries.map(([label, val]) => {
       const pct = maxVal > 0 ? Math.round((val / maxVal) * 100) : 0;
       return `
-        <div style="display:flex; align-items:center; gap:var(--space-3)">
-          <div style="width:140px; font-size:var(--text-xs); color:var(--color-text-secondary); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0" title="${label}">${label}</div>
-          <div style="flex:1; height:10px; background:var(--color-border-light); border-radius:var(--radius-full); overflow:hidden">
-            <div style="height:100%; width:${pct}%; background:${colorVar}; border-radius:var(--radius-full); transition:width 0.4s ease"></div>
+        <div style="display:flex;align-items:center;gap:var(--space-3)">
+          <div style="width:160px;font-size:var(--text-xs);color:var(--color-text-secondary);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0" title="${label}">${label}</div>
+          <div style="flex:1;height:10px;background:var(--color-border-light);border-radius:var(--radius-full);overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${colorVar};border-radius:var(--radius-full);transition:width 0.4s ease"></div>
           </div>
-          <div style="width:28px; font-size:var(--text-xs); font-weight:var(--font-semibold); color:var(--color-text-secondary)">${val}</div>
+          <div style="width:28px;font-size:var(--text-xs);font-weight:var(--font-semibold);color:${val > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'}">${val}</div>
         </div>
       `;
     }).join('');
   }
 
+  // ─── Cómputo ──────────────────────────────────────────────────────────────────
   function computeData() {
     const orders = Store.orders.all();
 
-    // Sabores: solo el campo flavor, sin formato ni promos
-    const flavorMap = {};
+    // Sabores: normalización a los 4 canónicos
+    // Degustación cuenta como 1 de cada sabor × qty
+    const flavorMap = { 'Romero y Sal': 0, 'Papa y Parmesano': 0, 'Tomate Cherry y Pesto': 0, 'Aceitunas': 0 };
     orders.forEach(o => {
       (o.items || []).forEach(item => {
         if ((item.format || '').toLowerCase() === 'promo') return;
-        const flavor = (item.flavor || '').trim();
-        if (!flavor) return;
-        flavorMap[flavor] = (flavorMap[flavor] || 0) + (item.qty || 1);
+        const qty = item.qty || 1;
+        if (isDegustacion(item)) {
+          // degustación = 1 de cada sabor
+          FLAVORS_FIXED.forEach(fl => { flavorMap[fl] = (flavorMap[fl] || 0) + qty; });
+          return;
+        }
+        const cf = canonicalFlavor(item.flavor);
+        if (cf) flavorMap[cf] = (flavorMap[cf] || 0) + qty;
       });
     });
-    const flavors = Object.entries(flavorMap).sort((a, b) => b[1] - a[1]);
+    // Mostrar siempre los 4, ordenados de mayor a menor
+    const flavors = FLAVORS_FIXED
+      .map(f => [f, flavorMap[f] || 0])
+      .sort((a, b) => b[1] - a[1]);
 
-    // Zonas
+    // Zonas: siempre las 6 fijas, más "sin zona" si hay pedidos sin zona
     const zoneMap = {};
+    ZONES_FIXED.forEach(z => { zoneMap[z] = 0; });
     orders.forEach(o => {
-      const zone = (o.zone || '').trim();
-      if (zone) zoneMap[zone] = (zoneMap[zone] || 0) + 1;
+      const norm = normalizeZone(o.zone);
+      if (norm) zoneMap[norm] = (zoneMap[norm] || 0) + 1;
     });
     const zones = Object.entries(zoneMap).sort((a, b) => b[1] - a[1]);
 
-    // Barrios
-    const barrioMap = {};
+    // Barrios (Villa Nueva): desde la colección barriosVN + conteo de pedidos
+    const knownBarrios = Store.barriosVN.all();
+    const barrioOrderMap = {};
     orders.forEach(o => {
-      const barrio = (o.barrio || '').trim();
-      if (barrio) barrioMap[barrio] = (barrioMap[barrio] || 0) + 1;
+      const b = (o.barrio || '').trim();
+      if (b) barrioOrderMap[b] = (barrioOrderMap[b] || 0) + 1;
     });
-    const barrios = Object.entries(barrioMap).sort((a, b) => b[1] - a[1]);
+    const barrios = knownBarrios.map(b => [b.name, b.id, barrioOrderMap[b.name] || 0]);
 
     // Clientes repetidos
     const clientMap = {};
@@ -62,11 +119,42 @@ const AnalyticsModule = (() => {
     return { flavors, zones, barrios, repeated, total: orders.length };
   }
 
+  // ─── Agregar barrio ───────────────────────────────────────────────────────────
+  function addBarrio() {
+    App.openModal({
+      title: 'Agregar barrio de Villa Nueva',
+      size: 'modal-sm',
+      body: `
+        <div class="form-group">
+          <label class="form-label">Nombre del barrio</label>
+          <input class="form-input" id="fBarrioName" placeholder="Ej: Los Robles, El Lago…" autofocus />
+        </div>
+      `,
+      primaryLabel: 'Agregar',
+      onConfirm: () => {
+        const name = document.getElementById('fBarrioName').value.trim();
+        if (!name) { App.toast('error', 'Ingresá el nombre del barrio'); return false; }
+        const exists = Store.barriosVN.where(b => b.name.toLowerCase() === name.toLowerCase()).length > 0;
+        if (exists) { App.toast('error', 'Ese barrio ya existe'); return false; }
+        Store.barriosVN.create({ name });
+        App.toast('success', `Barrio "${name}" agregado`);
+        render(document.getElementById('pageContent'));
+        return true;
+      },
+    });
+  }
+
+  function removeBarrio(id) {
+    if (!confirm('¿Eliminás este barrio?')) return;
+    Store.barriosVN.remove(id);
+    render(document.getElementById('pageContent'));
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────────
   function render(container) {
     const { flavors, zones, barrios, repeated, total } = computeData();
-    const maxFlavor  = flavors[0]?.[1]  || 1;
-    const maxZone    = zones[0]?.[1]    || 1;
-    const maxBarrio  = barrios[0]?.[1]  || 1;
+    const maxFlavor = flavors[0]?.[1] || 1;
+    const maxZone   = Math.max(...zones.map(([, v]) => v), 1);
 
     container.innerHTML = `
       <div class="fade-in">
@@ -84,14 +172,25 @@ const AnalyticsModule = (() => {
             <div class="card-header">
               <div>
                 <div class="card-title">Sabores más pedidos</div>
-                <div class="card-subtitle">Por unidades · solo sabores, sin formato ni promos</div>
+                <div class="card-subtitle">4 sabores · degustación = 1 de cada uno</div>
               </div>
-              ${flavors[0] ? `<span class="badge badge-primary">${flavors[0][0].split(' ').slice(0, 3).join(' ')}</span>` : ''}
+              ${flavors[0]?.[1] > 0 ? `<span class="badge badge-primary">${flavors[0][0]}</span>` : ''}
             </div>
-            <div style="display:flex; flex-direction:column; gap:var(--space-3)">
-              ${barChart(flavors.slice(0, 12), maxFlavor, 'var(--color-primary)', 'Aún no hay datos de sabores')}
+            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+              ${flavors.map(([label, val]) => {
+                const pct = maxFlavor > 0 ? Math.round((val / maxFlavor) * 100) : 0;
+                return `
+                  <div style="display:flex;align-items:center;gap:var(--space-3)">
+                    <div style="width:170px;font-size:var(--text-xs);color:var(--color-text-secondary);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0">${label}</div>
+                    <div style="flex:1;height:10px;background:var(--color-border-light);border-radius:var(--radius-full);overflow:hidden">
+                      <div style="height:100%;width:${pct}%;background:var(--color-primary);border-radius:var(--radius-full);transition:width .4s ease"></div>
+                    </div>
+                    <div style="width:28px;font-size:var(--text-xs);font-weight:600;color:${val > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'}">${val}</div>
+                  </div>
+                `;
+              }).join('')}
             </div>
-            ${flavors.length > 1 ? `
+            ${flavors.some(([, v]) => v > 0) ? `
               <div class="divider"></div>
               <div class="d-flex gap-4 text-xs" style="color:var(--color-text-muted)">
                 <div><span class="font-medium" style="color:var(--color-success)">↑ Más pedido:</span> ${flavors[0][0]} (${flavors[0][1]} u.)</div>
@@ -107,36 +206,44 @@ const AnalyticsModule = (() => {
                 <div class="card-title">Zonas de entrega</div>
                 <div class="card-subtitle">Pedidos por zona</div>
               </div>
-              ${zones[0] ? `<span class="badge badge-accent">${zones[0][0]}</span>` : ''}
             </div>
-            <div style="display:flex; flex-direction:column; gap:var(--space-3)">
-              ${barChart(zones.slice(0, 12), maxZone, 'var(--color-accent)', 'Sin datos de zona aún')}
+            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+              ${barChart(zones, maxZone, 'var(--color-accent)')}
             </div>
-            ${zones.length === 0 ? `
-              <div class="form-hint mt-2">Las zonas se cargan desde el detalle de cada pedido o desde Google Sheets.</div>
-            ` : ''}
           </div>
         </div>
 
         <div class="grid-2" style="align-items:start">
 
-          <!-- Barrios -->
+          <!-- Barrios de Villa Nueva -->
           <div class="card">
             <div class="card-header">
               <div>
-                <div class="card-title">Barrios</div>
-                <div class="card-subtitle">Distribución por barrio dentro de la zona</div>
+                <div class="card-title">Barrios — Villa Nueva</div>
+                <div class="card-subtitle">${barrios.length} barrio${barrios.length !== 1 ? 's' : ''} registrado${barrios.length !== 1 ? 's' : ''}</div>
               </div>
+              <button class="btn btn-sm btn-primary" onclick="AnalyticsModule.addBarrio()">+ Barrio</button>
             </div>
             ${barrios.length === 0 ? `
-              <div class="empty-state" style="padding:var(--space-6)">
-                <div class="empty-state-title">Sin barrios registrados aún</div>
-                <p class="empty-state-text">Asigná el barrio desde el detalle de cada pedido (campo "Barrio").</p>
+              <div class="empty-state" style="padding:var(--space-4)">
+                <div class="empty-state-title">Sin barrios todavía</div>
+                <p class="empty-state-text">Usá "+ Barrio" para agregar barrios de Villa Nueva.</p>
               </div>
             ` : `
-              <div style="display:flex; flex-direction:column; gap:var(--space-3)">
-                ${barChart(barrios.slice(0, 12), maxBarrio, 'var(--color-warning)', 'Sin datos')}
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                ${barrios.map(([name, id, count]) => `
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light)">
+                    <div>
+                      <div class="text-sm font-medium">${name}</div>
+                      <div class="text-xs" style="color:var(--color-text-muted)">${count} pedido${count !== 1 ? 's' : ''}</div>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-sm" onclick="AnalyticsModule.removeBarrio(${id})" title="Eliminar barrio">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                `).join('')}
               </div>
+              <div class="form-hint mt-3">Asigná el barrio desde el detalle de cada pedido.</div>
             `}
           </div>
 
@@ -147,7 +254,7 @@ const AnalyticsModule = (() => {
                 <div class="card-title">Clientes repetidos</div>
                 <div class="card-subtitle">Compraron más de una vez</div>
               </div>
-              ${repeated.length > 0 ? `<span class="badge badge-success">${repeated.length} cliente${repeated.length !== 1 ? 's' : ''}</span>` : ''}
+              ${repeated.length > 0 ? `<span class="badge badge-success">${repeated.length}</span>` : ''}
             </div>
             ${repeated.length === 0 ? `
               <div class="empty-state" style="padding:var(--space-6)">
@@ -174,5 +281,5 @@ const AnalyticsModule = (() => {
     `;
   }
 
-  return { render };
+  return { render, addBarrio, removeBarrio };
 })();

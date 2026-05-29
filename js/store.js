@@ -45,6 +45,9 @@ const Store = (() => {
     formats:  [],
     promos:   [],
     masaLog:  [],
+    barriosVN: [
+      { id: 1, name: 'San Marco', createdAt: '2026-05-28' },
+    ],
   };
 
   // ─── Private helpers ─────────────────────────────────────────────────────────
@@ -115,6 +118,7 @@ const Store = (() => {
     formats:     collection('formats'),
     promos:      collection('promos'),
     masaLog:     collection('masaLog'),
+    barriosVN:   collection('barriosVN'),
 
     /**
      * computeStockImpact — Dado un conjunto de orders, devuelve cuánto

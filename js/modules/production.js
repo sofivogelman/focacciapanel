@@ -8,7 +8,7 @@ const ProductionModule = (() => {
   // ─── Detección de individual de regalo ───────────────────────────────────────
   function tieneRegalo(flavor) {
     const f = (flavor || '').toLowerCase();
-    return f.includes('regalo') && !f.includes('sin individual');
+    return f.includes('regalo') && !f.includes('sin individual') && !f.includes('romero');
   }
 
   // ─── Cálculo del plan de producción ──────────────────────────────────────────
