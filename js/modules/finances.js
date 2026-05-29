@@ -151,29 +151,63 @@ const FinancesModule = (() => {
         try {
           const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array', cellDates: true });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
-          const mapped = rows.map(r => {
-            const keys = Object.keys(r);
-            const get = (...names) => {
-              for (const n of names) {
-                const k = keys.find(k => k.trim().toLowerCase().includes(n.toLowerCase()));
-                if (k !== undefined) return String(r[k] || '').trim();
-              }
-              return '';
-            };
-            const rawAmt = get('total').replace(/[^\d,.-]/g, '').replace(',', '.');
-            return {
-              date:        parseDate(get('fecha')),
-              description: get('producto', 'descripcion', 'detalle'),
-              amount:      parseFloat(rawAmt) || 0,
-              paymentType: get('cuota', 'contado'),
-            };
-          }).filter(r => r.date && r.amount > 0);
+          // raw:true → números como número JS, fechas como Date; evita reformateo por locale
+          const rows = XLSX.utils.sheet_to_json(ws, { raw: true, cellDates: true });
+          if (!rows.length) { App.toast('error', 'El archivo está vacío'); return; }
 
-          if (mapped.length === 0) { App.toast('error', 'No se encontraron filas válidas (necesita columnas Fecha y Total)'); return; }
+          // Normaliza nombre de columna: minúsculas, sin BOM, sin caracteres especiales
+          const nk = k => String(k).replace(/^﻿/, '').toLowerCase().trim();
+          const colKeys = Object.keys(rows[0]);
+          const findCol = (...names) => {
+            for (const n of names) {
+              const k = colKeys.find(k => nk(k).includes(n));
+              if (k) return k;
+            }
+            return null;
+          };
+
+          const colFecha   = findCol('fecha');
+          const colTotal   = findCol('total');
+          const colProduct = findCol('producto', 'descripcion', 'detalle');
+          const colCuotas  = findCol('cuota', 'contado');
+
+          if (!colFecha || !colTotal) {
+            App.toast('error', `Columnas detectadas: ${colKeys.join(', ')} — falta "Fecha" o "Total"`);
+            return;
+          }
+
+          const parseDateVal = v => {
+            if (v instanceof Date) return v.toISOString().slice(0, 10);
+            return parseDate(v);
+          };
+
+          // Maneja formato argentino: "1.500,00" → 1500; números raw pasan directo
+          const parseAmount = v => {
+            if (typeof v === 'number') return v;
+            let s = String(v || '').replace(/[^\d,.]/g, '');
+            if (!s) return 0;
+            if (s.includes(',')) {
+              s = s.replace(/\./g, '').replace(',', '.'); // puntos = miles, coma = decimal
+            } else {
+              s = s.replace(/\./g, ''); // puntos = separadores de miles
+            }
+            return parseFloat(s) || 0;
+          };
+
+          const mapped = rows.map(r => ({
+            date:        parseDateVal(r[colFecha]),
+            description: colProduct ? String(r[colProduct] || '').trim() : '',
+            amount:      parseAmount(r[colTotal]),
+            paymentType: colCuotas ? String(r[colCuotas] || '').trim() : '',
+          })).filter(r => r.date && r.amount > 0);
+
+          if (!mapped.length) {
+            App.toast('error', 'Filas encontradas pero ninguna tiene fecha y monto válidos');
+            return;
+          }
           showImportPreview(mapped);
         } catch (err) {
-          App.toast('error', 'No se pudo leer el archivo');
+          App.toast('error', 'No se pudo leer el archivo: ' + err.message);
         }
       };
       reader.readAsArrayBuffer(file);
