@@ -135,20 +135,26 @@ const AnalyticsModule = (() => {
       .map(f => [f, flavorMap[f]])
       .sort((a, b) => b[1] - a[1]);
 
-    // Zonas: siempre las 6 fijas con conteo
+    // Zonas: siempre las 6 fijas con conteo — usa zona del pedido, o del cliente como fallback
     const zoneMap = {};
     ZONES_FIXED.forEach(z => { zoneMap[z] = 0; });
     orders.forEach(o => {
-      const norm = normalizeZone(o.zone);
+      const client = Store.clients.find(o.clientId);
+      const norm = normalizeZone(o.zone) || normalizeZone(client?.zone);
       if (norm) zoneMap[norm] = (zoneMap[norm] || 0) + 1;
     });
     const zones = Object.entries(zoneMap).sort((a, b) => b[1] - a[1]);
 
-    // Barrios: extrae desde o.barrio (campo manual) o desde o.zone para Villa Nueva
+    // Barrios: pedido primero, luego cliente como fallback
     const knownBarrios = Store.barriosVN.all();
     const barrioOrderMap = {};
     orders.forEach(o => {
-      const b = (o.barrio || '').trim() || extractBarrioFromZone(o.zone) || '';
+      const client = Store.clients.find(o.clientId);
+      const b = (o.barrio || '').trim()
+        || extractBarrioFromZone(o.zone)
+        || (client?.barrio || '').trim()
+        || extractBarrioFromZone(client?.zone)
+        || '';
       if (b) barrioOrderMap[b] = (barrioOrderMap[b] || 0) + 1;
     });
     const barrios = knownBarrios.map(b => [b.name, b.id, barrioOrderMap[b.name] || 0]);
