@@ -136,15 +136,23 @@ const AnalyticsModule = (() => {
     });
     const barrios = knownBarrios.map(b => [b.name, b.id, barrioOrderMap[b.name] || 0]);
 
-    // Clientes repetidos
+    // Clientes repetidos — clave nombre+zona para no confundir homónimos
     const clientMap = {};
     orders.forEach(o => {
       const name = (o.clientName || '').trim();
-      if (name) clientMap[name] = (clientMap[name] || 0) + 1;
+      if (!name) return;
+      const zone = normalizeZone(o.zone) || '';
+      const k = name + '||' + zone;
+      if (!clientMap[k]) clientMap[k] = { name, zone, count: 0 };
+      clientMap[k].count++;
     });
-    const repeated = Object.entries(clientMap)
-      .filter(([, c]) => c > 1)
-      .sort((a, b) => b[1] - a[1]);
+    // Si hay dos clientes con el mismo nombre en distintas zonas, mostrar zona
+    const nameFreq = {};
+    Object.values(clientMap).forEach(c => { nameFreq[c.name] = (nameFreq[c.name] || 0) + 1; });
+    const repeated = Object.values(clientMap)
+      .filter(c => c.count > 1)
+      .sort((a, b) => b.count - a.count)
+      .map(c => [nameFreq[c.name] > 1 ? `${c.name} — ${c.zone || 'sin zona'}` : c.name, c.count]);
 
     return { flavors, zones, barrios, repeated, total: orders.length };
   }
