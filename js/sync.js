@@ -19,8 +19,8 @@ const Sync = (() => {
   function loadConfig() {
     try {
       const raw = localStorage.getItem(CONFIG_KEY);
-      return raw ? JSON.parse(raw) : { url: '', interval: 15, enabled: false };
-    } catch { return { url: '', interval: 15, enabled: false }; }
+      return raw ? JSON.parse(raw) : { url: '', interval: 28800, enabled: false };
+    } catch { return { url: '', interval: 28800, enabled: false }; }
   }
 
   function saveConfig(cfg) {
@@ -332,7 +332,7 @@ const Sync = (() => {
           <div class="form-group">
             <label class="form-label">Intervalo de actualización</label>
             <select class="form-select" id="fSyncInterval">
-              ${[[10,'Cada 10 segundos'],[15,'Cada 15 segundos'],[30,'Cada 30 segundos'],[60,'Cada 1 minuto']].map(
+              ${[[3600,'Cada 1 hora'],[14400,'Cada 4 horas'],[28800,'Cada 8 horas'],[86400,'Cada 24 horas']].map(
                 ([v, l]) => `<option value="${v}" ${cfg.interval === v ? 'selected' : ''}>${l}</option>`
               ).join('')}
             </select>
@@ -366,7 +366,7 @@ const Sync = (() => {
       primaryLabel: 'Guardar y activar',
       onConfirm: () => {
         const url      = document.getElementById('fSyncUrl').value.trim();
-        const interval = parseInt(document.getElementById('fSyncInterval').value) || 15;
+        const interval = parseInt(document.getElementById('fSyncInterval').value) || 28800;
         const enabled  = document.getElementById('fSyncEnabled').value === 'si';
 
         if (enabled && !url) { App.toast('error', 'Ingresá la URL del Web App'); return false; }
