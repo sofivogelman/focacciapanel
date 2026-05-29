@@ -115,17 +115,30 @@ const DashboardModule = (() => {
   }
 
   // ─── Pedidos pendientes agrupados por día ─────────────────────────────────────
+  const STATUS_OPTS = [
+    { val: 'pendiente',      label: 'Pendiente' },
+    { val: 'en_preparacion', label: 'En preparación' },
+    { val: 'listo',          label: 'Listo' },
+    { val: 'entregado',      label: 'Entregado' },
+  ];
+
+  function setOrderStatus(id, status) {
+    Store.orders.update(id, { status });
+    const badge = document.getElementById('pendingBadge');
+    if (badge) badge.textContent = Store.orders.where(o => o.status === 'pendiente').length;
+    render(document.getElementById('pageContent'));
+  }
+
   function renderPendingByDay() {
-    const pending = Store.orders
-      .where(o => o.status === 'pendiente')
+    // Muestra pendiente + en preparación + listo (activos, no entregados/cancelados)
+    const active = Store.orders
+      .where(o => ['pendiente', 'en_preparacion', 'listo'].includes(o.status))
       .sort((a, b) => (a.deliveryDate || a.date || '').localeCompare(b.deliveryDate || b.date || ''));
 
-    if (pending.length === 0) {
+    if (active.length === 0) {
       return `
         <div class="card">
-          <div class="card-header">
-            <div class="card-title">Pedidos pendientes</div>
-          </div>
+          <div class="card-header"><div class="card-title">Pedidos activos</div></div>
           <div class="empty-state" style="padding:var(--space-8)">
             <div class="empty-state-title">Sin pedidos pendientes</div>
           </div>
@@ -134,7 +147,7 @@ const DashboardModule = (() => {
     }
 
     const byDate = {};
-    pending.forEach(o => {
+    active.forEach(o => {
       const key = o.deliveryDate || o.date || '—';
       if (!byDate[key]) byDate[key] = [];
       byDate[key].push(o);
@@ -147,151 +160,35 @@ const DashboardModule = (() => {
     };
 
     return `
-      <div class="card" style="overflow:hidden">
+      <div class="card">
         <div class="card-header">
           <div>
-            <div class="card-title">Pedidos pendientes</div>
-            <div class="card-subtitle">${pending.length} pedido${pending.length !== 1 ? 's' : ''} por entregar</div>
+            <div class="card-title">Pedidos activos</div>
+            <div class="card-subtitle">${active.length} pedido${active.length !== 1 ? 's' : ''} sin entregar</div>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="Router.navigate('orders')">Ver todos</button>
         </div>
         ${Object.entries(byDate).map(([date, orders]) => `
-          <div style="margin-bottom:var(--space-4)">
-            <div style="font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;padding:var(--space-1) 0 var(--space-2);border-bottom:2px solid var(--color-border-light)">
-              <span style="text-transform:capitalize">${fmtDate(date)}</span>
-              <span style="font-weight:400;text-transform:none;margin-left:var(--space-2);opacity:.7">${orders.length} pedido${orders.length !== 1 ? 's' : ''}</span>
+          <div style="margin-bottom:var(--space-5)">
+            <div style="font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;padding-bottom:var(--space-2);border-bottom:2px solid var(--color-border-light);margin-bottom:var(--space-2);text-transform:capitalize">
+              ${fmtDate(date)}
             </div>
-            ${orders.map(o => `
-              <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light);gap:var(--space-3)">
-                <div style="min-width:0">
-                  <div class="text-sm font-medium" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.clientName}</div>
-                  <div class="text-xs" style="color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                    ${(o.items || []).map(i => `${i.qty}× ${i.flavor || i.name || ''}`).join(' · ')}
-                  </div>
+            ${orders.map(o => {
+              const lines = (o.items || [])
+                .map(i => `${i.qty}× <strong>${i.format || ''}</strong>${i.flavor ? ' — ' + i.flavor : ''}`)
+                .join('<br>');
+              return `
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light);gap:var(--space-3)">
+                  <div class="text-sm" style="line-height:1.7;flex:1">${lines}</div>
+                  <select class="form-select" style="flex-shrink:0;width:auto;min-width:130px;height:28px;font-size:var(--text-xs);padding:0 var(--space-2)"
+                    onchange="DashboardModule.setOrderStatus(${o.id}, this.value)">
+                    ${STATUS_OPTS.map(s => `<option value="${s.val}" ${o.status === s.val ? 'selected' : ''}>${s.label}</option>`).join('')}
+                  </select>
                 </div>
-                <div class="text-sm font-semibold" style="color:var(--color-primary);white-space:nowrap">$${o.total.toLocaleString('es-AR')}</div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         `).join('')}
-      </div>
-    `;
-  }
-
-  // ─── Sección de impacto en stock ─────────────────────────────────────────────
-  function renderStockImpact() {
-    const toProduceStatuses = ['pendiente', 'en_preparacion'];
-    const pendingOrders     = Store.orders.where(o => toProduceStatuses.includes(o.status));
-    const impact            = Store.computeStockImpact(pendingOrders);
-
-    // Resumen: total de unidades a producir
-    const totalUnits  = pendingOrders.reduce((s, o) =>
-      s + (o.items || []).reduce((ss, i) => ss + (i.qty || 1), 0), 0);
-    const totalCost   = impact.reduce((s, i) => s + i.costNeeded, 0);
-    const deficits    = impact.filter(i => i.deficit).length;
-
-    if (pendingOrders.length === 0) {
-      return `
-        <div class="card mt-6 mb-6" style="border-style:dashed; opacity:0.6">
-          <div class="card-header">
-            <div class="card-title">Producción pendiente</div>
-          </div>
-          <div class="empty-state" style="padding:var(--space-6)">
-            <div class="empty-state-title">Sin pedidos pendientes para producir</div>
-            <p class="empty-state-text">Cuando haya pedidos en estado "Pendiente" o "En preparación",
-              acá aparecerá el impacto de cada receta sobre el stock de ingredientes.</p>
-          </div>
-        </div>
-      `;
-    }
-
-    // Pill resumen arriba de la tabla
-    const summaryPills = `
-      <div class="d-flex gap-3 flex-wrap" style="margin-bottom:var(--space-4)">
-        <div style="background:var(--color-primary-subtle); border-radius:var(--radius-md); padding:var(--space-2) var(--space-4); text-align:center">
-          <div class="text-xs text-muted">Pedidos a producir</div>
-          <div class="font-semibold text-primary">${pendingOrders.length}</div>
-        </div>
-        <div style="background:var(--color-surface-alt); border-radius:var(--radius-md); padding:var(--space-2) var(--space-4); text-align:center">
-          <div class="text-xs text-muted">Unidades totales</div>
-          <div class="font-semibold">${totalUnits}</div>
-        </div>
-        <div style="background:var(--color-accent-subtle); border-radius:var(--radius-md); padding:var(--space-2) var(--space-4); text-align:center">
-          <div class="text-xs text-muted">Costo estimado de ingredientes</div>
-          <div class="font-semibold" style="color:var(--color-accent)">${fmt(totalCost)}</div>
-        </div>
-        ${deficits > 0 ? `
-          <div style="background:var(--color-danger-bg); border-radius:var(--radius-md); padding:var(--space-2) var(--space-4); text-align:center">
-            <div class="text-xs" style="color:var(--color-danger)">Ingredientes con déficit</div>
-            <div class="font-semibold" style="color:var(--color-danger)">${deficits}</div>
-          </div>
-        ` : `
-          <div style="background:var(--color-success-bg); border-radius:var(--radius-md); padding:var(--space-2) var(--space-4); text-align:center">
-            <div class="text-xs" style="color:var(--color-success)">Stock suficiente</div>
-            <div class="font-semibold" style="color:var(--color-success)">Todo OK</div>
-          </div>
-        `}
-      </div>
-    `;
-
-    const tableRows = impact.length === 0
-      ? `<tr><td colspan="6">
-           <div class="empty-state" style="padding:var(--space-6)">
-             <div class="empty-state-title">Sin recetas configuradas aún</div>
-             <p class="empty-state-text">Los pedidos no tienen productos del catálogo asignados,
-               por lo que no se puede calcular el impacto en stock.</p>
-           </div>
-         </td></tr>`
-      : impact.map(i => {
-          const afterFormatted = i.after >= 0
-            ? `${i.after} ${i.unit}`
-            : `<span style="color:var(--color-danger);font-weight:var(--font-semibold)">${i.after} ${i.unit} ⚠</span>`;
-          const statusBadge = i.deficit
-            ? `<span class="badge badge-danger">Falta ${Math.abs(i.after)} ${i.unit}</span>`
-            : `<span class="badge badge-success">OK</span>`;
-          const rowBg = i.deficit ? 'background:var(--color-danger-bg)' : '';
-          return `
-            <tr style="${rowBg}">
-              <td class="font-medium">${i.name}</td>
-              <td class="text-sm">${i.needed} ${i.unit}</td>
-              <td class="text-sm">${i.stock} ${i.unit}</td>
-              <td class="text-sm">${afterFormatted}</td>
-              <td class="text-sm text-secondary">${fmt(i.costNeeded)}</td>
-              <td>${statusBadge}</td>
-            </tr>
-          `;
-        }).join('');
-
-    return `
-      <div class="card mt-6 mb-6" style="${deficits > 0 ? 'border-color: var(--color-danger)' : ''}">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Producción pendiente — Impacto en stock</div>
-            <div class="card-subtitle">
-              Cruce de recetas con ${pendingOrders.length} pedido${pendingOrders.length !== 1 ? 's' : ''}
-              en estado Pendiente / En preparación
-            </div>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="Router.navigate('inventory')">Ver inventario</button>
-        </div>
-
-        ${summaryPills}
-
-        <div class="table-wrapper" style="border:none; margin:0 calc(-1 * var(--space-6)) calc(-1 * var(--space-6)); border-radius:0">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Ingrediente</th>
-                <th>Necesario</th>
-                <th>Stock actual</th>
-                <th>Tras producción</th>
-                <th>Costo estimado</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-        </div>
       </div>
     `;
   }
@@ -304,9 +201,9 @@ const DashboardModule = (() => {
 
     container.innerHTML = `
       <div class="fade-in">
-        <div class="page-header d-flex items-center justify-between">
+        <div class="page-header">
           <div>
-            <h1 class="page-title">Buen día 👋</h1>
+            <h1 class="page-title">Buen día</h1>
             <p class="page-subtitle">
               Resumen del emprendimiento
               ${gasCount > 0 ? `· <span class="text-primary font-medium">${gasCount} pedido${gasCount !== 1 ? 's' : ''} vía Google Sheets</span>` : ''}
@@ -314,8 +211,11 @@ const DashboardModule = (() => {
           </div>
         </div>
 
+        <!-- Recordatorio de masa — primero -->
+        ${renderMasaReminder()}
+
         <!-- KPI Cards -->
-        <div class="grid-4" style="margin-bottom:var(--space-8)">
+        <div class="grid-4" style="margin-bottom:var(--space-6)">
           <div class="stat-card" style="--stat-color:var(--color-primary)">
             <div class="stat-label">Ingresos del mes</div>
             <div class="stat-value">${fmt(stats.revenue)}</div>
@@ -324,24 +224,23 @@ const DashboardModule = (() => {
           <div class="stat-card" style="--stat-color:var(--color-accent)">
             <div class="stat-label">Ganancia neta</div>
             <div class="stat-value">${fmt(stats.profit)}</div>
-            <div class="stat-meta">Después de gastos: ${fmt(stats.monthExpenses)}</div>
+            <div class="stat-meta">Gastos: ${fmt(stats.monthExpenses)}</div>
           </div>
           <div class="stat-card" style="--stat-color:var(--color-warning)">
             <div class="stat-label">Pedidos pendientes</div>
             <div class="stat-value">${stats.pending}</div>
-            <div class="stat-meta">De ${stats.totalOrders} pedidos este mes</div>
+            <div class="stat-meta">De ${stats.totalOrders} este mes</div>
           </div>
           <div class="stat-card" style="--stat-color:${stats.lowStock > 0 ? 'var(--color-danger)' : 'var(--color-success)'}">
             <div class="stat-label">Stock bajo</div>
             <div class="stat-value">${stats.lowStock}</div>
-            <div class="stat-meta">${stats.lowStock === 0 ? 'Todo el inventario OK' : 'Ingredientes por reponer'}</div>
+            <div class="stat-meta">${stats.lowStock === 0 ? 'Inventario OK' : 'Ingredientes por reponer'}</div>
           </div>
         </div>
 
-        <!-- Pedidos pendientes por día + Alertas de stock -->
-        <div class="grid-2" style="align-items:start; margin-bottom:var(--space-8)">
+        <!-- Pedidos activos + Alertas de stock -->
+        <div class="grid-2" style="align-items:start">
 
-          <!-- Pedidos pendientes por día -->
           ${renderPendingByDay()}
 
           <!-- Alertas de stock -->
@@ -362,7 +261,7 @@ const DashboardModule = (() => {
                 <p class="empty-state-text">No hay ingredientes con stock bajo.</p>
               </div>
             ` : `
-              <div style="display:flex; flex-direction:column; gap:var(--space-3)">
+              <div style="display:flex;flex-direction:column;gap:var(--space-3)">
                 ${lowStock.slice(0, 6).map(i => {
                   const pct   = Math.min(100, Math.round((i.stock / i.minStock) * 100));
                   const isLow = i.stock <= i.minStock;
@@ -370,12 +269,10 @@ const DashboardModule = (() => {
                     <div>
                       <div class="d-flex items-center justify-between" style="margin-bottom:var(--space-1)">
                         <span class="text-sm font-medium">${i.name}</span>
-                        <span class="text-xs ${isLow ? 'text-danger' : 'text-warning'}">
-                          ${i.stock} ${i.unit} / mín ${i.minStock}
-                        </span>
+                        <span class="text-xs ${isLow ? 'text-danger' : 'text-warning'}">${i.stock} ${i.unit} / mín ${i.minStock}</span>
                       </div>
                       <div class="progress">
-                        <div class="progress-bar" style="width:${pct}%; background:${isLow ? 'var(--color-danger)' : 'var(--color-warning)'}"></div>
+                        <div class="progress-bar" style="width:${pct}%;background:${isLow ? 'var(--color-danger)' : 'var(--color-warning)'}"></div>
                       </div>
                     </div>
                   `;
@@ -384,37 +281,9 @@ const DashboardModule = (() => {
             `}
           </div>
         </div>
-
-        <!-- Recordatorio de masa -->
-        ${renderMasaReminder()}
-
-        <!-- Producción pendiente → Impacto en stock y costos -->
-        ${renderStockImpact()}
-
-        <!-- Catálogo activo -->
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Productos activos</div>
-              <div class="card-subtitle">Tu catálogo actual</div>
-            </div>
-            <button class="btn btn-ghost btn-sm" onclick="Router.navigate('products')">Gestionar</button>
-          </div>
-          <div style="display:flex; gap:var(--space-3); flex-wrap:wrap">
-            ${Store.products.where(p => p.active).map(p => `
-              <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--space-4); background:var(--color-bg); border:var(--border); border-radius:var(--radius-lg); min-width:200px;">
-                <span style="font-size:24px">${p.image}</span>
-                <div>
-                  <div class="text-sm font-medium">${p.name}</div>
-                  <div class="text-xs text-secondary">${fmt(p.price)} / ${p.unit}</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
       </div>
     `;
   }
 
-  return { render };
+  return { render, setOrderStatus };
 })();
