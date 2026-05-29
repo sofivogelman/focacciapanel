@@ -217,13 +217,10 @@ const DashboardModule = (() => {
       <div class="fade-in">
         <div class="page-header">
           <div>
-            <h1 class="page-title">Buen día</h1>
-            <p class="page-subtitle">
-              Resumen del emprendimiento
-              ${gasCount > 0 ? `· <span class="text-primary font-medium">${gasCount} pedido${gasCount !== 1 ? 's' : ''} vía Google Sheets</span>` : ''}
-            </p>
+            <h1 class="page-title">Buen día 🌿</h1>
+            <p class="page-subtitle">Resumen del emprendimiento</p>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="FinancesModule.openCreateModal()">+ Registrar gasto</button>
+          <button class="btn btn-primary btn-sm" onclick="FinancesModule.openWithReceipt()">Subir comprobante</button>
         </div>
 
         <!-- Recordatorio de masa — primero -->

@@ -412,11 +412,8 @@ const FinancesModule = (() => {
     container.innerHTML = `
       <div class="fade-in">
         <div class="page-header">
-          <div>
-            <h1 class="page-title">Finanzas</h1>
-            <p class="page-subtitle">Ingresos, gastos y rentabilidad del emprendimiento.</p>
-          </div>
-          <button class="btn btn-primary" onclick="FinancesModule.openCreateModal()">Registrar gasto</button>
+          <h1 class="page-title">Finanzas</h1>
+          <p class="page-subtitle">Ingresos, gastos y rentabilidad del emprendimiento.</p>
         </div>
 
         <!-- KPIs del mes actual -->
