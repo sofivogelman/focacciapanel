@@ -94,7 +94,8 @@ const FinancesModule = (() => {
       createInstallments(base, installments);
       App.toast('success', installments > 1 ? `Gasto en ${installments} cuotas registrado` : 'Gasto registrado');
     }
-    render(document.getElementById('pageContent'));
+    // Si estamos en finanzas re-renderizamos; si no (ej. dashboard) solo se guarda y listo
+    if (Router.current() === 'finances') render(document.getElementById('pageContent'));
     return true;
   }
 
@@ -334,28 +335,75 @@ const FinancesModule = (() => {
     `;
   }
 
-  function last6Months() {
-    const months = [];
+  function relevantMonths() {
     const now = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = d.toISOString().slice(0, 7);
-      const label = d.toLocaleDateString('es-AR', { month: 'short', year: '2-digit' });
-      months.push({ key, label });
+    const thisMonth = now.toISOString().slice(0, 7);
+    const set = new Set();
+    // Siempre incluir los últimos 3 meses + actual
+    for (let i = -3; i <= 0; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      set.add(d.toISOString().slice(0, 7));
     }
-    return months;
+    // Agregar meses futuros que tengan gastos (cuotas), hasta 24 meses adelante
+    const maxFuture = new Date(now.getFullYear(), now.getMonth() + 24, 1).toISOString().slice(0, 7);
+    Store.expenses.all().forEach(e => {
+      const m = (e.date || '').slice(0, 7);
+      if (m > thisMonth && m <= maxFuture) set.add(m);
+    });
+    return [...set].sort().map(key => {
+      const d = new Date(key + '-01T12:00:00');
+      return { key, label: d.toLocaleDateString('es-AR', { month: 'short', year: '2-digit' }) };
+    });
+  }
+
+  function renderMonthlyTable(months) {
+    const current = currentMonth();
+    return `
+      <div class="card" style="margin-bottom:var(--space-6)">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Resultados por mes</div>
+            <div class="card-subtitle">Ingresos cobrados · gastos comprometidos (incluye cuotas)</div>
+          </div>
+        </div>
+        <div class="table-wrapper" style="border:none;margin:calc(-1 * var(--space-4)) calc(-1 * var(--space-6));border-radius:0">
+          <table class="table">
+            <thead><tr><th>Mes</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Gastos</th><th style="text-align:right">Ganancia</th></tr></thead>
+            <tbody>
+              ${months.map(m => {
+                const d = getMonthData(m.key);
+                const profit = d.revenue - d.totalExp;
+                const hasData = d.revenue > 0 || d.totalExp > 0;
+                const isCurrent = m.key === current;
+                const dash = `<span style="color:var(--color-text-muted)">—</span>`;
+                return `
+                  <tr${isCurrent ? ' style="background:var(--color-primary-subtle,#f0f7f4)"' : ''}>
+                    <td class="font-medium text-sm" style="text-transform:capitalize">
+                      ${m.label}${isCurrent ? ' <span class="badge badge-primary" style="margin-left:4px">Actual</span>' : ''}
+                    </td>
+                    <td class="text-sm" style="text-align:right">${d.revenue > 0 ? fmt(d.revenue) : dash}</td>
+                    <td class="text-sm" style="text-align:right${d.totalExp > 0 ? ';color:var(--color-danger)' : ''}">${d.totalExp > 0 ? fmt(d.totalExp) : dash}</td>
+                    <td class="text-sm" style="text-align:right;font-weight:600;color:${profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}">${hasData ? fmt(profit) : dash}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   }
 
   function render(container) {
     const month   = currentMonth();
     const data    = getMonthData(month);
-    const months  = last6Months();
+    const months  = relevantMonths();
     const expsByMonth = months.map(m => {
       const d = getMonthData(m.key);
       return { ...m, revenue: d.revenue, expenses: d.totalExp };
     });
 
-    // Expense breakdown by category
+    // Expense breakdown by category (this month)
     const byCat = {};
     data.expenses.forEach(e => {
       byCat[e.category] = (byCat[e.category] || 0) + e.amount;
@@ -364,69 +412,72 @@ const FinancesModule = (() => {
     container.innerHTML = `
       <div class="fade-in">
         <div class="page-header">
-          <h1 class="page-title">Finanzas</h1>
-          <p class="page-subtitle">Ingresos, gastos y rentabilidad del emprendimiento.</p>
+          <div>
+            <h1 class="page-title">Finanzas</h1>
+            <p class="page-subtitle">Ingresos, gastos y rentabilidad del emprendimiento.</p>
+          </div>
+          <button class="btn btn-primary" onclick="FinancesModule.openCreateModal()">Registrar gasto</button>
         </div>
 
-        <!-- Month KPIs -->
-        <div class="grid-4" style="margin-bottom: var(--space-8)">
-          <div class="stat-card" style="--stat-color: var(--color-primary)">
+        <!-- KPIs del mes actual -->
+        <div class="grid-4" style="margin-bottom:var(--space-6)">
+          <div class="stat-card" style="--stat-color:var(--color-primary)">
             <div class="stat-label">Ingresos este mes</div>
             <div class="stat-value">${fmt(data.revenue)}</div>
             <div class="stat-meta">Pedidos cobrados</div>
           </div>
-          <div class="stat-card" style="--stat-color: var(--color-warning)">
+          <div class="stat-card" style="--stat-color:var(--color-warning)">
             <div class="stat-label">Por cobrar</div>
             <div class="stat-value">${fmt(data.pending)}</div>
             <div class="stat-meta">Pedidos sin cobrar</div>
           </div>
-          <div class="stat-card" style="--stat-color: var(--color-accent)">
+          <div class="stat-card" style="--stat-color:var(--color-accent)">
             <div class="stat-label">Gastos este mes</div>
             <div class="stat-value">${fmt(data.totalExp)}</div>
-            <div class="stat-meta">${data.expenses.length} registros</div>
+            <div class="stat-meta">${data.expenses.length} registro${data.expenses.length !== 1 ? 's' : ''}</div>
           </div>
-          <div class="stat-card" style="--stat-color: ${data.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}">
+          <div class="stat-card" style="--stat-color:${data.profit >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}">
             <div class="stat-label">Ganancia neta</div>
             <div class="stat-value ${data.profit < 0 ? 'text-danger' : ''}">${fmt(data.profit)}</div>
             <div class="stat-meta">Ingresos − Gastos</div>
           </div>
         </div>
 
-        <div class="grid-2" style="align-items: start; margin-bottom: var(--space-8)">
+        <!-- Tabla de resultados por mes -->
+        ${renderMonthlyTable(months)}
 
-          <!-- Chart last 6 months -->
+        <!-- Gráfico evolución + Categorías -->
+        <div class="grid-2" style="align-items:start;margin-bottom:var(--space-6)">
+
           <div class="card">
             <div class="card-header">
-              <div class="card-title">Últimos 6 meses</div>
+              <div class="card-title">Evolución mensual</div>
             </div>
-            <div style="display: flex; flex-direction: column; gap: var(--space-4)">
+            <div style="display:flex;flex-direction:column;gap:var(--space-4)">
               ${expsByMonth.map(m => renderMonthBar(m.label, m.revenue, m.expenses)).join('')}
             </div>
-            <div class="d-flex gap-4 mt-4" style="font-size: var(--text-xs); color: var(--color-text-muted)">
-              <div class="d-flex items-center gap-1"><div style="width:10px;height:10px;border-radius:50%;background:var(--color-primary)"></div> Ingresos cobrados</div>
+            <div class="d-flex gap-4 mt-4" style="font-size:var(--text-xs);color:var(--color-text-muted)">
+              <div class="d-flex items-center gap-1"><div style="width:10px;height:10px;border-radius:50%;background:var(--color-primary)"></div> Ingresos</div>
               <div class="d-flex items-center gap-1"><div style="width:10px;height:10px;border-radius:50%;background:var(--color-accent)"></div> Gastos</div>
             </div>
           </div>
 
-          <!-- Expense breakdown -->
           <div class="card">
             <div class="card-header">
               <div class="card-title">Gastos por categoría</div>
               <div class="card-subtitle">Este mes</div>
             </div>
-            ${Object.keys(byCat).length === 0 ? '<div class="empty-state" style="padding: var(--space-8)"><div class="empty-state-title">Sin gastos registrados</div></div>' : `
-              <div style="display: flex; flex-direction: column; gap: var(--space-3)">
-                ${Object.entries(byCat).sort((a,b) => b[1]-a[1]).map(([cat, amt]) => {
+            ${Object.keys(byCat).length === 0 ? '<div class="empty-state" style="padding:var(--space-8)"><div class="empty-state-title">Sin gastos este mes</div></div>' : `
+              <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+                ${Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([cat, amt]) => {
                   const pct = data.totalExp > 0 ? Math.round((amt / data.totalExp) * 100) : 0;
                   return `
                     <div>
-                      <div class="d-flex justify-between items-center" style="margin-bottom: var(--space-1)">
+                      <div class="d-flex justify-between items-center" style="margin-bottom:var(--space-1)">
                         <span class="text-sm">${EXP_CATS[cat] || cat}</span>
                         <span class="text-sm font-medium">${fmt(amt)} <span class="text-muted">(${pct}%)</span></span>
                       </div>
-                      <div class="progress">
-                        <div class="progress-bar" style="width: ${pct}%; background: var(--color-accent)"></div>
-                      </div>
+                      <div class="progress"><div class="progress-bar" style="width:${pct}%;background:var(--color-accent)"></div></div>
                     </div>
                   `;
                 }).join('')}

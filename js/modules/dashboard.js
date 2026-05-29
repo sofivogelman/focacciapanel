@@ -223,6 +223,7 @@ const DashboardModule = (() => {
               ${gasCount > 0 ? `· <span class="text-primary font-medium">${gasCount} pedido${gasCount !== 1 ? 's' : ''} vía Google Sheets</span>` : ''}
             </p>
           </div>
+          <button class="btn btn-ghost btn-sm" onclick="FinancesModule.openCreateModal()">+ Registrar gasto</button>
         </div>
 
         <!-- Recordatorio de masa — primero -->
