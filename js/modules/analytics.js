@@ -43,6 +43,20 @@ const AnalyticsModule = (() => {
     'Otro',
   ];
 
+  // Devuelve la etiqueta más específica: barrio secundario si existe, si no la zona principal.
+  // "Barrio de Villa Nueva - San Marco - Lote 5"  → "San Marco"
+  // "Barrio de Villa Nueva - Yo la busco x tu casa" → "Yo la busco x tu casa"
+  // "Vila Terra"                                   → "Vila Terra"
+  function zoneLabel(raw) {
+    const z = (raw || '').trim();
+    if (!z) return '';
+    const parts = z.split(/\s*-\s*/);
+    const secondary = (parts[1] || '').trim();
+    // Si la segunda parte existe y no es un lote, es el barrio secundario
+    if (secondary && !/^(lote|lt\.?)\s*\d/i.test(secondary)) return secondary;
+    return normalizeZone(z) || parts[0].trim();
+  }
+
   function normalizeZone(zone) {
     const z = (zone || '').trim();
     if (!z) return null;
@@ -139,22 +153,20 @@ const AnalyticsModule = (() => {
     });
     const barrios = knownBarrios.map(b => [b.name, b.id, barrioOrderMap[b.name] || 0]);
 
-    // Clientes repetidos — clave por nombre; zona/barrio se toma del primer pedido que lo tenga
+    // Clientes repetidos — etiqueta = barrio secundario si existe, si no zona principal
     const clientMap = {};
     orders.forEach(o => {
       const name = (o.clientName || '').trim();
       if (!name) return;
-      const zone   = normalizeZone(o.zone) || '';
-      const barrio = (o.barrio || '').trim() || extractBarrioFromZone(o.zone) || '';
-      if (!clientMap[name]) clientMap[name] = { name, barrio: '', zone: '', count: 0 };
+      const label = (o.barrio || '').trim() || zoneLabel(o.zone) || '';
+      if (!clientMap[name]) clientMap[name] = { name, label: '', count: 0 };
       clientMap[name].count++;
-      if (!clientMap[name].barrio && barrio) clientMap[name].barrio = barrio;
-      if (!clientMap[name].zone  && zone)   clientMap[name].zone   = zone;
+      if (!clientMap[name].label && label) clientMap[name].label = label;
     });
     const repeated = Object.values(clientMap)
       .filter(c => c.count > 1)
       .sort((a, b) => b.count - a.count)
-      .map(c => [`${c.name} — ${c.barrio || c.zone || 'sin zona'}`, c.count]);
+      .map(c => [`${c.name} — ${c.label || 'sin zona'}`, c.count]);
 
     return { flavors, zones, barrios, repeated, total: orders.length };
   }
