@@ -1,6 +1,8 @@
 const ClientsModule = (() => {
   let searchQuery = '';
 
+  const ZONE_OPTS = ['Barrio de Villa Nueva','Vila Terra','Centro Comercial Nordelta','Lirios del Talar','Terrazas/Casas de Santa Maria','Talar del lago 2','Otro'];
+
   function initials(name) {
     return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
   }
@@ -21,6 +23,7 @@ const ClientsModule = (() => {
             <div class="font-semibold truncate">${c.name}</div>
             ${c.phone ? `<div class="text-xs text-secondary mt-1">${c.phone}</div>` : ''}
             ${c.email ? `<div class="text-xs text-secondary truncate">${c.email}</div>` : ''}
+            ${(c.barrio || c.zone) ? `<div class="text-xs mt-1" style="color:var(--color-primary)">${c.barrio || c.zone}</div>` : ''}
           </div>
         </div>
         ${c.address ? `<div class="d-flex gap-2 items-center text-xs text-secondary" style="margin-bottom: var(--space-3)">
@@ -75,6 +78,22 @@ const ClientsModule = (() => {
         <label class="form-label">Dirección <span>(opcional)</span></label>
         <input class="form-input" id="fCliAddress" value="${isEdit ? c.address : ''}" placeholder="Barrio, Ciudad…" />
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Zona de entrega</label>
+          <select class="form-select" id="fCliZone">
+            <option value="">Sin zona</option>
+            ${ZONE_OPTS.map(z => `<option value="${z}" ${isEdit && c.zone === z ? 'selected' : ''}>${z}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Barrio <span>(Villa Nueva)</span></label>
+          <select class="form-select" id="fCliBarrio">
+            <option value="">Sin barrio</option>
+            ${Store.barriosVN.all().map(b => `<option value="${b.name}" ${isEdit && c.barrio === b.name ? 'selected' : ''}>${b.name}</option>`).join('')}
+          </select>
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label">Notas internas <span>(opcional)</span></label>
         <textarea class="form-textarea" id="fCliNotes" placeholder="Preferencias, descuentos, días de entrega…">${isEdit ? c.notes : ''}</textarea>
@@ -90,6 +109,8 @@ const ClientsModule = (() => {
       phone:   document.getElementById('fCliPhone').value.trim(),
       email:   document.getElementById('fCliEmail').value.trim(),
       address: document.getElementById('fCliAddress').value.trim(),
+      zone:    document.getElementById('fCliZone').value,
+      barrio:  document.getElementById('fCliBarrio').value,
       notes:   document.getElementById('fCliNotes').value.trim(),
     };
     if (editId) { Store.clients.update(editId, data); App.toast('success', 'Cliente actualizado'); }
@@ -141,6 +162,45 @@ const ClientsModule = (() => {
     });
   }
 
+  function openBulkZoneModal() {
+    const clients = Store.clients.all().sort((a, b) => a.name.localeCompare(b.name));
+    const barrioOpts = Store.barriosVN.all();
+    App.openModal({
+      title: 'Asignar zonas en masa',
+      size: 'modal-lg',
+      primaryLabel: 'Guardar todo',
+      body: `
+        <p class="text-sm text-secondary" style="margin-bottom:var(--space-4)">Completá la zona de cada cliente. Solo guardá los que cambiaste.</p>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+          ${clients.map(c => `
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-2);align-items:center;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light)">
+              <div class="text-sm font-medium">${c.name}</div>
+              <select class="form-select" data-client-id="${c.id}" data-field="zone" style="height:32px;font-size:var(--text-xs)">
+                <option value="">Sin zona</option>
+                ${ZONE_OPTS.map(z => `<option value="${z}" ${c.zone === z ? 'selected' : ''}>${z}</option>`).join('')}
+              </select>
+              <select class="form-select" data-client-id="${c.id}" data-field="barrio" style="height:32px;font-size:var(--text-xs)">
+                <option value="">Sin barrio</option>
+                ${barrioOpts.map(b => `<option value="${b.name}" ${c.barrio === b.name ? 'selected' : ''}>${b.name}</option>`).join('')}
+              </select>
+            </div>
+          `).join('')}
+        </div>
+      `,
+      onConfirm: () => {
+        document.querySelectorAll('[data-client-id][data-field="zone"]').forEach(sel => {
+          const id     = parseInt(sel.dataset.clientId);
+          const zone   = sel.value;
+          const barrio = sel.closest('div').querySelector('[data-field="barrio"]').value;
+          Store.clients.update(id, { zone, barrio });
+        });
+        App.toast('success', 'Zonas actualizadas');
+        render(document.getElementById('pageContent'));
+        return true;
+      },
+    });
+  }
+
   function remove(id) {
     const st = clientStats(id);
     if (st.orders > 0 && !confirm(`Este cliente tiene ${st.orders} pedido(s). ¿Igual lo eliminás?`)) return;
@@ -164,6 +224,7 @@ const ClientsModule = (() => {
             <h1 class="page-title">Clientes</h1>
             <p class="page-subtitle">${Store.clients.count()} clientes en total</p>
           </div>
+          <button class="btn btn-secondary btn-sm" onclick="ClientsModule.openBulkZoneModal()">Asignar zonas</button>
         </div>
 
         <div class="d-flex gap-3" style="margin-bottom: var(--space-6)">
@@ -193,5 +254,5 @@ const ClientsModule = (() => {
     });
   }
 
-  return { render, openCreateModal, openEditModal, viewOrders, remove };
+  return { render, openCreateModal, openEditModal, viewOrders, remove, openBulkZoneModal };
 })();

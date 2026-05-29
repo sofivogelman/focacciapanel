@@ -153,12 +153,15 @@ const AnalyticsModule = (() => {
     });
     const barrios = knownBarrios.map(b => [b.name, b.id, barrioOrderMap[b.name] || 0]);
 
-    // Clientes repetidos — etiqueta = barrio secundario si existe, si no zona principal
+    // Clientes repetidos — etiqueta = barrio/zona del pedido, o del cliente si el pedido no tiene
     const clientMap = {};
     orders.forEach(o => {
       const name = (o.clientName || '').trim();
       if (!name) return;
-      const label = (o.barrio || '').trim() || zoneLabel(o.zone) || '';
+      const orderLabel = (o.barrio || '').trim() || zoneLabel(o.zone) || '';
+      const client = Store.clients.find(o.clientId);
+      const clientLabel = (client?.barrio || '').trim() || zoneLabel(client?.zone) || '';
+      const label = orderLabel || clientLabel;
       if (!clientMap[name]) clientMap[name] = { name, label: '', count: 0 };
       clientMap[name].count++;
       if (!clientMap[name].label && label) clientMap[name].label = label;
