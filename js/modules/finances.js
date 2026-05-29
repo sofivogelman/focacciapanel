@@ -1,5 +1,5 @@
 const FinancesModule = (() => {
-  const EXP_CATS = { ingredientes: 'Ingredientes', servicios: 'Servicios', packaging: 'Packaging', logistica: 'Logística', marketing: 'Marketing', otro: 'Otro' };
+  const EXP_CATS = { ingredientes: 'Ingredientes', equipamiento: 'Equipamiento/Utensilios', servicios: 'Servicios', packaging: 'Packaging', logistica: 'Logística', marketing: 'Marketing', otro: 'Otro' };
 
   function fmt(n) { return '$' + n.toLocaleString('es-AR'); }
 
