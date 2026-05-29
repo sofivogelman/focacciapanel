@@ -184,10 +184,22 @@ const DeliveriesModule = (() => {
       notes:     document.getElementById('fRepNotes')?.value.trim() || '',
     };
 
+    const routeLabel = data.stops.map(s => ZONE_LABELS[s] || s).join(', ');
+    const expDesc = `Nafta — ${routeLabel} (${km} km)`;
+
     if (editId) {
+      const existing = Store.deliveries.find(editId);
+      if (existing?.expenseId) {
+        Store.expenses.update(existing.expenseId, { amount: cost, description: expDesc, date: data.date });
+      } else {
+        const exp = Store.expenses.create({ description: expDesc, amount: cost, category: 'logistica', date: data.date });
+        data.expenseId = exp.id;
+      }
       Store.deliveries.update(editId, data);
       App.toast('success', 'Salida actualizada');
     } else {
+      const exp = Store.expenses.create({ description: expDesc, amount: cost, category: 'logistica', date: data.date });
+      data.expenseId = exp.id;
       Store.deliveries.create(data);
       App.toast('success', `Salida registrada · ${km} km · $${cost.toLocaleString('es-AR')}`);
     }
@@ -198,6 +210,8 @@ const DeliveriesModule = (() => {
 
   function remove(id) {
     if (!confirm('¿Eliminás esta salida?')) return;
+    const d = Store.deliveries.find(id);
+    if (d?.expenseId) Store.expenses.remove(d.expenseId);
     Store.deliveries.remove(id);
     App.toast('success', 'Salida eliminada');
     render(document.getElementById('pageContent'));
