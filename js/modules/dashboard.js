@@ -18,6 +18,7 @@ const DashboardModule = (() => {
     const MASA_G           = { familiar: 900, individual: 280 };
     const MASA_POR_BOLSA   = 1910;
     const HARINA_POR_BOLSA = 1000;
+    const MS_HOUR          = 60 * 60 * 1000;
 
     function tieneRegalo(flavor) {
       const f = (flavor || '').toLowerCase();
@@ -29,51 +30,52 @@ const DashboardModule = (() => {
 
     const byDate = {};
     pending.forEach(order => {
-      const date = order.deliveryDate || order.date || '—';
-      if (date === '—') return;
+      // Solo usamos deliveryDate — no fallback a order.date (que es la fecha del pedido, no entrega)
+      const date = order.deliveryDate || '';
+      if (!date) return;
       if (!byDate[date]) byDate[date] = { familiares: 0, individuales: 0, regalo: 0 };
       (order.items || []).forEach(item => {
-        const fmt = (item.format || '').toLowerCase();
+        const f = (item.format || '').toLowerCase();
         const qty = item.qty || 1;
-        if (fmt === 'familiar') {
+        if (f === 'familiar') {
           byDate[date].familiares += qty;
           if (tieneRegalo(item.flavor)) byDate[date].regalo += qty;
-        } else if (fmt === 'individual') {
+        } else if (f === 'individual') {
           byDate[date].individuales += qty;
         }
       });
     });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const msDay = 24 * 60 * 60 * 1000;
-
+    const now = new Date();
     let overflow = 0;
+
     const reminders = Object.entries(byDate)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, c]) => {
-        const masaNeta       = c.familiares * MASA_G.familiar + (c.individuales + c.regalo) * MASA_G.individual;
-        const bolsas         = Math.ceil(masaNeta / MASA_POR_BOLSA);
-        const masaFinal      = bolsas * MASA_POR_BOLSA;
-        const masaLograda    = Store.masaLog.where(l => l.deliveryDate === date).reduce((s, l) => s + (l.grams || 0), 0);
-        const masaHecha      = masaLograda + overflow;
-        overflow             = Math.max(0, masaHecha - masaFinal);
-        const masaPendiente  = Math.max(0, masaFinal - masaHecha);
-        const bolsasPend     = Math.ceil(masaPendiente / MASA_POR_BOLSA);
-        const completa       = masaHecha >= masaFinal && masaFinal > 0;
+        const masaNeta     = c.familiares * MASA_G.familiar + (c.individuales + c.regalo) * MASA_G.individual;
+        const bolsas       = Math.ceil(masaNeta / MASA_POR_BOLSA);
+        const masaFinal    = bolsas * MASA_POR_BOLSA;
+        const masaLograda  = Store.masaLog.where(l => l.deliveryDate === date).reduce((s, l) => s + (l.grams || 0), 0);
+        const masaHecha    = masaLograda + overflow;
+        overflow           = Math.max(0, masaHecha - masaFinal);
+        const masaPendiente = Math.max(0, masaFinal - masaHecha);
+        const bolsasPend   = Math.ceil(masaPendiente / MASA_POR_BOLSA);
+        const completa     = masaHecha >= masaFinal && masaFinal > 0;
 
-        const deliveryD = new Date(date + 'T12:00:00');
-        const deadline  = new Date(deliveryD.getTime() - 48 * msDay);
-        deadline.setHours(0, 0, 0, 0);
-        const daysLeft = Math.round((deadline - today) / msDay);
+        // deadline = exactamente 48 horas antes del mediodía de entrega
+        const deliveryD  = new Date(date + 'T12:00:00');
+        const deadline   = new Date(deliveryD.getTime() - 48 * MS_HOUR);
+        // horas hasta el deadline (positivo = todavía hay tiempo, negativo = ya pasó)
+        const hoursLeft  = (deadline - now) / MS_HOUR;
 
-        return { date, masaPendiente, bolsasPend, harinaFinal: bolsasPend * HARINA_POR_BOLSA, completa, deliveryD, deadline, daysLeft };
+        return { date, masaPendiente, bolsasPend, harinaFinal: bolsasPend * HARINA_POR_BOLSA, completa, deliveryD, deadline, hoursLeft };
       })
-      .filter(r => !r.completa && r.masaPendiente > 0);
+      // excluir completas, sin pendiente, y entregas ya pasadas
+      .filter(r => !r.completa && r.masaPendiente > 0 && r.deliveryD > now);
 
     if (reminders.length === 0) return '';
 
-    const fmtDate = d => d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const fmtD = d => d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
 
     return `
       <div class="card" style="margin-bottom:var(--space-6); border-color:var(--color-primary)">
@@ -85,20 +87,21 @@ const DashboardModule = (() => {
           <button class="btn btn-ghost btn-sm" onclick="Router.navigate('produccion')">Ver producción</button>
         </div>
         ${reminders.slice(0, 3).map(r => {
-          const overdue  = r.daysLeft < 0;
-          const todayDue = r.daysLeft === 0;
-          const color    = overdue ? 'var(--color-danger)' : todayDue ? 'var(--color-warning)' : 'var(--color-text-primary)';
+          const overdue  = r.hoursLeft < 0;
+          const todayDue = r.hoursLeft >= 0 && r.hoursLeft < 24;
+          const tomorDue = r.hoursLeft >= 24 && r.hoursLeft < 48;
+          const color = overdue ? 'var(--color-danger)' : todayDue ? 'var(--color-warning)' : 'var(--color-text-primary)';
           let label;
-          if (overdue)        label = `Debería estar hecha — entrega ${fmtDate(r.deliveryD)}`;
-          else if (todayDue)  label = `Hacerla hoy — entrega ${fmtDate(r.deliveryD)}`;
-          else if (r.daysLeft === 1) label = `Hacerla mañana — entrega ${fmtDate(r.deliveryD)}`;
-          else                label = `Antes del ${fmtDate(r.deadline)} — entrega ${fmtDate(r.deliveryD)}`;
+          if (overdue)       label = `Debería estar hecha — entrega ${fmtD(r.deliveryD)}`;
+          else if (todayDue) label = `Hacerla hoy — entrega ${fmtD(r.deliveryD)}`;
+          else if (tomorDue) label = `Hacerla mañana — entrega ${fmtD(r.deliveryD)}`;
+          else               label = `Antes del ${fmtD(r.deadline)} — entrega ${fmtD(r.deliveryD)}`;
 
           return `
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); padding:var(--space-3) 0; border-bottom:1px solid var(--color-border-light)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);padding:var(--space-3) 0;border-bottom:1px solid var(--color-border-light)">
               <div>
-                <div class="text-sm font-semibold" style="color:${color}; text-transform:capitalize">${label}</div>
-                <div class="text-xs" style="color:var(--color-text-muted); margin-top:2px">
+                <div class="text-sm font-semibold" style="color:${color};text-transform:capitalize">${label}</div>
+                <div class="text-xs" style="color:var(--color-text-muted);margin-top:2px">
                   ${r.bolsasPend} bolsa${r.bolsasPend !== 1 ? 's' : ''} de 1kg · ${r.harinaFinal}g harina → ${r.masaPendiente}g masa
                 </div>
               </div>
@@ -107,6 +110,70 @@ const DashboardModule = (() => {
             </div>
           `;
         }).join('')}
+      </div>
+    `;
+  }
+
+  // ─── Pedidos pendientes agrupados por día ─────────────────────────────────────
+  function renderPendingByDay() {
+    const pending = Store.orders
+      .where(o => o.status === 'pendiente')
+      .sort((a, b) => (a.deliveryDate || a.date || '').localeCompare(b.deliveryDate || b.date || ''));
+
+    if (pending.length === 0) {
+      return `
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Pedidos pendientes</div>
+          </div>
+          <div class="empty-state" style="padding:var(--space-8)">
+            <div class="empty-state-title">Sin pedidos pendientes</div>
+          </div>
+        </div>
+      `;
+    }
+
+    const byDate = {};
+    pending.forEach(o => {
+      const key = o.deliveryDate || o.date || '—';
+      if (!byDate[key]) byDate[key] = [];
+      byDate[key].push(o);
+    });
+
+    const fmtDate = str => {
+      if (!str || str === '—') return 'Sin fecha';
+      try { return new Date(str + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }); }
+      catch { return str; }
+    };
+
+    return `
+      <div class="card" style="overflow:hidden">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Pedidos pendientes</div>
+            <div class="card-subtitle">${pending.length} pedido${pending.length !== 1 ? 's' : ''} por entregar</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="Router.navigate('orders')">Ver todos</button>
+        </div>
+        ${Object.entries(byDate).map(([date, orders]) => `
+          <div style="margin-bottom:var(--space-4)">
+            <div style="font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;padding:var(--space-1) 0 var(--space-2);border-bottom:2px solid var(--color-border-light)">
+              <span style="text-transform:capitalize">${fmtDate(date)}</span>
+              <span style="font-weight:400;text-transform:none;margin-left:var(--space-2);opacity:.7">${orders.length} pedido${orders.length !== 1 ? 's' : ''}</span>
+            </div>
+            ${orders.map(o => `
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light);gap:var(--space-3)">
+                <div style="min-width:0">
+                  <div class="text-sm font-medium" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.clientName}</div>
+                  <div class="text-xs" style="color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    ${(o.items || []).map(i => `${i.qty}× ${i.flavor || i.name || ''}`).join(' · ')}
+                  </div>
+                </div>
+                <div class="text-sm font-semibold" style="color:var(--color-primary);white-space:nowrap">$${o.total.toLocaleString('es-AR')}</div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('')}
       </div>
     `;
   }
@@ -231,11 +298,9 @@ const DashboardModule = (() => {
 
   // ─── Render principal ────────────────────────────────────────────────────────
   function render(container) {
-    const stats        = Store.stats();
-    const allOrders    = Store.orders.all().sort((a, b) => b.id - a.id);
-    const recentOrders = allOrders.slice(0, 5);
-    const lowStock     = Store.ingredients.where(i => i.stock <= i.minStock * 1.3);
-    const gasCount     = Store.orders.where(o => o.fromGAS).length;
+    const stats    = Store.stats();
+    const lowStock = Store.ingredients.where(i => i.stock <= i.minStock * 1.3);
+    const gasCount = Store.orders.where(o => o.fromGAS).length;
 
     container.innerHTML = `
       <div class="fade-in">
@@ -273,50 +338,11 @@ const DashboardModule = (() => {
           </div>
         </div>
 
-        <!-- Pedidos recientes + Alertas de stock -->
+        <!-- Pedidos pendientes por día + Alertas de stock -->
         <div class="grid-2" style="align-items:start; margin-bottom:var(--space-8)">
 
-          <!-- Pedidos recientes -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Pedidos recientes</div>
-                <div class="card-subtitle">Últimas 5 actividades</div>
-              </div>
-              <button class="btn btn-ghost btn-sm" onclick="Router.navigate('orders')">Ver todos</button>
-            </div>
-            ${recentOrders.length === 0 ? `
-              <div class="empty-state" style="padding:var(--space-8)">
-                <div class="empty-state-title">Sin pedidos aún</div>
-              </div>
-            ` : `
-              <div style="margin:calc(-1 * var(--space-4)) calc(-1 * var(--space-6)) calc(-1 * var(--space-6)); overflow:auto">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th>Cliente</th>
-                      <th>Entrega</th>
-                      <th>Total</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${recentOrders.map(o => `
-                      <tr>
-                        <td>
-                          <div class="font-medium">${o.clientName}</div>
-                          ${o.fromGAS ? '<div class="text-xs" style="color:var(--color-primary);opacity:0.7">vía Sheets</div>' : ''}
-                        </td>
-                        <td class="text-secondary text-sm">${o.deliveryDate || '—'}</td>
-                        <td class="font-medium">${fmt(o.total)}</td>
-                        <td>${statusBadge(o.status)}</td>
-                      </tr>
-                    `).join('')}
-                  </tbody>
-                </table>
-              </div>
-            `}
-          </div>
+          <!-- Pedidos pendientes por día -->
+          ${renderPendingByDay()}
 
           <!-- Alertas de stock -->
           <div class="card">
