@@ -4,7 +4,7 @@ const CalendarModule = (() => {
   // 2. Creá credencial: OAuth 2.0 > Aplicación web
   // 3. En "Orígenes de JS autorizados" agregá el URL desde el que abrís el panel
   // 4. Pegá el Client ID acá abajo:
-  const CLIENT_ID = '';
+  const CLIENT_ID = '733992786485-hfh0q4g69pimubj4g9mriggdjul3p1au.apps.googleusercontent.com';
 
   const SCOPE    = 'https://www.googleapis.com/auth/calendar.events';
   const COLOR_ID = '3'; // grape = violeta
