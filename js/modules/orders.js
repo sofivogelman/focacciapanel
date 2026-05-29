@@ -64,6 +64,9 @@ const OrdersModule = (() => {
             <button class="btn btn-ghost btn-icon btn-sm" title="Editar" onclick="OrdersModule.openEditModal(${o.id})">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
+            <button class="btn btn-ghost btn-icon btn-sm" title="${o.calendarEventId ? 'Ya en Google Calendar' : 'Agregar al Google Calendar'}" onclick="CalendarModule.addToCalendar(${o.id})" style="${o.calendarEventId ? 'color:var(--color-success)' : ''}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </button>
             <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar" onclick="OrdersModule.remove(${o.id})">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
             </button>
@@ -129,12 +132,18 @@ const OrdersModule = (() => {
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Zona de entrega</label>
-        <select class="form-select" id="fOrderZone">
-          <option value="">Sin zona</option>
-          ${ZONE_OPTS.map(z => `<option value="${z}" ${isEdit && normalizeZoneSelect(o.zone) === z ? 'selected' : ''}>${z}</option>`).join('')}
-        </select>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Zona de entrega</label>
+          <select class="form-select" id="fOrderZone">
+            <option value="">Sin zona</option>
+            ${ZONE_OPTS.map(z => `<option value="${z}" ${isEdit && normalizeZoneSelect(o.zone) === z ? 'selected' : ''}>${z}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lote <span>(opcional)</span></label>
+          <input type="text" class="form-input" id="fOrderLote" placeholder="Ej: 257" value="${isEdit ? (o.lote || '') : ''}" />
+        </div>
       </div>
 
       <!-- Items -->
@@ -293,8 +302,9 @@ const OrdersModule = (() => {
     if (items.length === 0) { App.toast('error', 'Agregá al menos un producto'); return false; }
 
     const zone  = document.getElementById('fOrderZone').value;
+    const lote  = document.getElementById('fOrderLote').value.trim();
     const total = items.reduce((s, i) => s + i.qty * i.price, 0);
-    const data  = { clientId, clientName: client?.name || '', date, deliveryDate: delivery, status, items, total, paymentMethod: payment, paid, notes, zone };
+    const data  = { clientId, clientName: client?.name || '', date, deliveryDate: delivery, status, items, total, paymentMethod: payment, paid, notes, zone, lote };
 
     if (editId) {
       Store.orders.update(editId, data);
@@ -326,7 +336,7 @@ const OrdersModule = (() => {
 
           <div class="divider"></div>
 
-          <!-- Zona / Barrio -->
+          <!-- Zona / Barrio / Lote -->
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Zona de entrega</label>
@@ -346,6 +356,14 @@ const OrdersModule = (() => {
                 ).join('')}
               </select>
             </div>
+          </div>
+          <div class="form-group" style="max-width:180px">
+            <label class="form-label">Lote <span style="color:var(--color-text-muted);font-weight:400">(opcional)</span></label>
+            <input type="text" class="form-input" id="dOrderLote" placeholder="Ej: 257" value="${(() => {
+              if (o.lote) return o.lote;
+              const m = (o.zone || '').match(/lote\\s*(\\d+)/i);
+              return m ? m[1] : '';
+            })()" />
           </div>
 
           <div class="divider"></div>
@@ -419,6 +437,7 @@ const OrdersModule = (() => {
           paid:          document.getElementById('dOrderPaid').value === 'si',
           zone:          document.getElementById('dOrderZone').value.trim(),
           barrio:        document.getElementById('dOrderBarrio').value.trim(),
+          lote:          document.getElementById('dOrderLote').value.trim(),
         });
         refreshTable();
         App.toast('success', 'Pedido actualizado');
