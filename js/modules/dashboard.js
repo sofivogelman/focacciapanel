@@ -159,6 +159,40 @@ const DashboardModule = (() => {
       catch { return str; }
     };
 
+    function daySection(date, orders) {
+      // Aggregate items across all orders for this day
+      const itemMap = {};
+      orders.forEach(o => {
+        (o.items || []).forEach(i => {
+          const flavor = (i.flavor || '').trim();
+          const k = (i.format || '').toLowerCase() + '||' + flavor.toLowerCase();
+          if (!itemMap[k]) itemMap[k] = { format: i.format || '', flavor, qty: 0 };
+          itemMap[k].qty += (i.qty || 1);
+        });
+      });
+      const itemLines = Object.values(itemMap)
+        .map(i => `${i.qty}× <strong>${i.format}</strong>${i.flavor ? ' — ' + i.flavor : ''}`)
+        .join('<br>');
+
+      return `
+        <div style="margin-bottom:var(--space-5)">
+          <div style="font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;padding-bottom:var(--space-2);border-bottom:2px solid var(--color-border-light);margin-bottom:var(--space-3);text-transform:capitalize">
+            ${fmtDate(date)}
+          </div>
+          <div class="text-sm" style="line-height:2;padding-bottom:var(--space-3);border-bottom:1px solid var(--color-border-light);margin-bottom:var(--space-2)">${itemLines}</div>
+          ${orders.map(o => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-1) 0;gap:var(--space-3)">
+              <div class="text-xs" style="color:var(--color-text-muted);flex:1">${o.clientName || 'Pedido #' + o.id}</div>
+              <select class="form-select" style="flex-shrink:0;width:auto;min-width:130px;height:28px;font-size:var(--text-xs);padding:0 var(--space-2)"
+                onchange="DashboardModule.setOrderStatus(${o.id}, this.value)">
+                ${STATUS_OPTS.map(s => `<option value="${s.val}" ${o.status === s.val ? 'selected' : ''}>${s.label}</option>`).join('')}
+              </select>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
     return `
       <div class="card">
         <div class="card-header">
@@ -168,27 +202,7 @@ const DashboardModule = (() => {
           </div>
           <button class="btn btn-ghost btn-sm" onclick="Router.navigate('orders')">Ver todos</button>
         </div>
-        ${Object.entries(byDate).map(([date, orders]) => `
-          <div style="margin-bottom:var(--space-5)">
-            <div style="font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;padding-bottom:var(--space-2);border-bottom:2px solid var(--color-border-light);margin-bottom:var(--space-2);text-transform:capitalize">
-              ${fmtDate(date)}
-            </div>
-            ${orders.map(o => {
-              const lines = (o.items || [])
-                .map(i => `${i.qty}× <strong>${i.format || ''}</strong>${i.flavor ? ' — ' + i.flavor : ''}`)
-                .join('<br>');
-              return `
-                <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light);gap:var(--space-3)">
-                  <div class="text-sm" style="line-height:1.7;flex:1">${lines}</div>
-                  <select class="form-select" style="flex-shrink:0;width:auto;min-width:130px;height:28px;font-size:var(--text-xs);padding:0 var(--space-2)"
-                    onchange="DashboardModule.setOrderStatus(${o.id}, this.value)">
-                    ${STATUS_OPTS.map(s => `<option value="${s.val}" ${o.status === s.val ? 'selected' : ''}>${s.label}</option>`).join('')}
-                  </select>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `).join('')}
+        ${Object.entries(byDate).map(([date, orders]) => daySection(date, orders)).join('')}
       </div>
     `;
   }
