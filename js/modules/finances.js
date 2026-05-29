@@ -40,7 +40,10 @@ const FinancesModule = (() => {
     return `
       <div class="form-group">
         <label class="form-label">Descripción *</label>
-        <input class="form-input" id="fExpDesc" value="${isEdit ? e.description : ''}" placeholder="Compra de harina, gas, etc." required />
+        <input class="form-input" id="fExpDesc" value="${isEdit ? e.description : ''}" placeholder="Compra de harina, gas, etc." list="expIngredientsList" autocomplete="off" required />
+        <datalist id="expIngredientsList">
+          ${Store.ingredients.all().map(i => `<option value="${i.name}">`).join('')}
+        </datalist>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -54,9 +57,26 @@ const FinancesModule = (() => {
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Fecha</label>
-        <input type="date" class="form-input" id="fExpDate" value="${isEdit ? e.date : new Date().toISOString().slice(0,10)}" />
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Fecha</label>
+          <input type="date" class="form-input" id="fExpDate" value="${isEdit ? e.date : new Date().toISOString().slice(0,10)}" />
+        </div>
+        ${!isEdit ? `
+        <div class="form-group">
+          <label class="form-label">Cuotas</label>
+          <select class="form-select" id="fExpInstallments">
+            <option value="1">Contado</option>
+            <option value="2">2 cuotas</option>
+            <option value="3">3 cuotas</option>
+            <option value="6">6 cuotas</option>
+            <option value="9">9 cuotas</option>
+            <option value="12">12 cuotas</option>
+            <option value="18">18 cuotas</option>
+            <option value="24">24 cuotas</option>
+          </select>
+        </div>
+        ` : ''}
       </div>
     `;
   }
@@ -65,11 +85,29 @@ const FinancesModule = (() => {
     const desc   = document.getElementById('fExpDesc').value.trim();
     const amount = parseFloat(document.getElementById('fExpAmount').value);
     if (!desc || !amount || amount <= 0) { App.toast('error', 'Completá descripción y monto'); return false; }
-    const data = { description: desc, amount, category: document.getElementById('fExpCat').value, date: document.getElementById('fExpDate').value };
-    if (editId) { Store.expenses.update(editId, data); App.toast('success', 'Gasto actualizado'); }
-    else        { Store.expenses.create(data); App.toast('success', 'Gasto registrado'); }
+    const base = { description: desc, amount, category: document.getElementById('fExpCat').value, date: document.getElementById('fExpDate').value };
+    if (editId) {
+      Store.expenses.update(editId, base);
+      App.toast('success', 'Gasto actualizado');
+    } else {
+      const installments = parseInt(document.getElementById('fExpInstallments')?.value || '1') || 1;
+      createInstallments(base, installments);
+      App.toast('success', installments > 1 ? `Gasto en ${installments} cuotas registrado` : 'Gasto registrado');
+    }
     render(document.getElementById('pageContent'));
     return true;
+  }
+
+  function createInstallments(base, installments) {
+    const monthly = Math.floor(base.amount / installments);
+    for (let i = 0; i < installments; i++) {
+      const d = new Date(base.date + 'T12:00:00');
+      d.setMonth(d.getMonth() + i);
+      const isLast = i === installments - 1;
+      const amt = isLast ? base.amount - monthly * (installments - 1) : monthly;
+      const desc = installments > 1 ? `${base.description} (cuota ${i + 1}/${installments})` : base.description;
+      Store.expenses.create({ ...base, date: d.toISOString().slice(0, 10), description: desc, amount: amt });
+    }
   }
 
   function openCreateModal() {
@@ -87,6 +125,152 @@ const FinancesModule = (() => {
     Store.expenses.remove(id);
     App.toast('success', 'Gasto eliminado');
     render(document.getElementById('pageContent'));
+  }
+
+  // ─── Import Excel ─────────────────────────────────────────────────────────────
+  function parseDate(raw) {
+    if (!raw) return '';
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (!m) return '';
+    const year = m[3].length === 2 ? '20' + m[3] : m[3];
+    return `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+
+  function importFromExcel() {
+    if (typeof XLSX === 'undefined') { App.toast('error', 'Librería no disponible, revisá tu conexión'); return; }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx,.xls,.csv';
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = evt => {
+        try {
+          const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array', cellDates: true });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+          const mapped = rows.map(r => {
+            const keys = Object.keys(r);
+            const get = (...names) => {
+              for (const n of names) {
+                const k = keys.find(k => k.trim().toLowerCase().includes(n.toLowerCase()));
+                if (k !== undefined) return String(r[k] || '').trim();
+              }
+              return '';
+            };
+            const rawAmt = get('total').replace(/[^\d,.-]/g, '').replace(',', '.');
+            return {
+              date:        parseDate(get('fecha')),
+              description: get('producto', 'descripcion', 'detalle'),
+              amount:      parseFloat(rawAmt) || 0,
+              paymentType: get('cuota', 'contado'),
+            };
+          }).filter(r => r.date && r.amount > 0);
+
+          if (mapped.length === 0) { App.toast('error', 'No se encontraron filas válidas (necesita columnas Fecha y Total)'); return; }
+          showImportPreview(mapped);
+        } catch (err) {
+          App.toast('error', 'No se pudo leer el archivo');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    };
+    input.click();
+  }
+
+  function parseInstallments(s) {
+    if (!s) return 1;
+    const str = String(s).toLowerCase().trim();
+    if (!str || str === 'contado') return 1;
+    const m = str.match(/(\d+)/);
+    const n = m ? parseInt(m[1]) : 1;
+    return n > 1 ? n : 1;
+  }
+
+  function showImportPreview(rows) {
+    const tableRows = rows.slice(0, 60).map(r => `
+      <tr>
+        <td class="text-sm">${r.date}</td>
+        <td class="text-sm font-medium">${r.description || '—'}</td>
+        <td class="text-sm" style="color:var(--color-text-muted)">${r.paymentType || '—'}</td>
+        <td class="text-sm font-medium" style="color:var(--color-danger)">${fmt(r.amount)}</td>
+      </tr>
+    `).join('');
+    const extra = rows.length > 60 ? `<div class="form-hint" style="margin-top:var(--space-2)">+${rows.length - 60} filas más…</div>` : '';
+    const total = rows.reduce((s, r) => s + r.amount, 0);
+
+    App.openModal({
+      title: `Importar ${rows.length} gastos — ${fmt(total)} total`,
+      size: 'modal-lg',
+      body: `
+        <div class="form-group" style="margin-bottom:var(--space-4)">
+          <label class="form-label">Categoría para todos</label>
+          <select class="form-select" id="fImportCat">
+            ${Object.entries(EXP_CATS).map(([k, v]) => `<option value="${k}" ${k === 'ingredientes' ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+          <div class="form-hint">Podés editar gastos individualmente después de importar.</div>
+        </div>
+        <div style="max-height:340px;overflow-y:auto;border:1px solid var(--color-border-light);border-radius:var(--radius-sm)">
+          <table class="table" style="margin:0">
+            <thead><tr><th>Fecha</th><th>Producto</th><th>Pago</th><th>Total</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+        ${extra}
+      `,
+      primaryLabel: `Importar ${rows.length} gastos`,
+      onConfirm: () => {
+        const cat = document.getElementById('fImportCat').value;
+        let count = 0;
+        rows.forEach(r => {
+          const n = parseInstallments(r.paymentType);
+          createInstallments({ date: r.date, description: r.description || 'Sin descripción', amount: r.amount, category: cat }, n);
+          count += n;
+        });
+        App.toast('success', `${rows.length} compra${rows.length !== 1 ? 's' : ''} → ${count} registro${count !== 1 ? 's' : ''} importado${count !== 1 ? 's' : ''}`);
+        render(document.getElementById('pageContent'));
+        return true;
+      },
+    });
+  }
+
+  // ─── Comprobante (imagen / PDF) ───────────────────────────────────────────────
+  function openWithReceipt() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,application/pdf';
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const isPDF = file.type === 'application/pdf';
+      App.openModal({
+        title: 'Cargar comprobante',
+        size: 'modal-lg',
+        body: `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5);align-items:start">
+            <div style="background:var(--color-border-light);border-radius:var(--radius-sm);overflow:hidden;min-height:200px;display:flex;align-items:center;justify-content:center">
+              ${isPDF
+                ? `<iframe src="${url}" style="width:100%;height:400px;border:none"></iframe>`
+                : `<img src="${url}" style="width:100%;max-height:400px;object-fit:contain;display:block" />`
+              }
+            </div>
+            <div>
+              <div class="form-hint" style="margin-bottom:var(--space-4)">Registrá solo los productos del negocio. Si aparece algo nuevo que necesitás comprar, agregalo primero en Ingredientes.</div>
+              ${buildExpenseForm()}
+            </div>
+          </div>
+        `,
+        primaryLabel: 'Registrar gasto',
+        // El archivo nunca se guarda — se libera al cerrar el modal (confirm, cancelar, X o Escape)
+        onClose: () => URL.revokeObjectURL(url),
+        onConfirm: () => saveExpense(null),
+      });
+    };
+    input.click();
   }
 
   function renderMonthBar(label, revenue, expenses) {
@@ -224,6 +408,10 @@ const FinancesModule = (() => {
               <div class="card-title">Registro de gastos</div>
               <div class="card-subtitle">Todos los gastos ingresados</div>
             </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-ghost btn-sm" onclick="FinancesModule.openWithReceipt()">Subir comprobante</button>
+              <button class="btn btn-sm btn-primary" onclick="FinancesModule.importFromExcel()">Importar Excel</button>
+            </div>
           </div>
           <div class="table-wrapper" style="border:none; margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-6)); border-radius: 0">
             <table class="table">
@@ -241,5 +429,5 @@ const FinancesModule = (() => {
     `;
   }
 
-  return { render, openCreateModal, openEditExpense, removeExpense };
+  return { render, openCreateModal, openEditExpense, removeExpense, importFromExcel, openWithReceipt };
 })();

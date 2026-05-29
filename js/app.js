@@ -38,9 +38,11 @@ const App = (() => {
 
   // ─── Modal ──────────────────────────────────────────────────────────────────
   let activeModal = null;
+  let activeModalOnClose = null;
 
-  function openModal({ title, body, primaryLabel = 'Confirmar', onConfirm, hideCancelBtn = false, size = '', onOpen }) {
+  function openModal({ title, body, primaryLabel = 'Confirmar', onConfirm, hideCancelBtn = false, size = '', onOpen, onClose }) {
     closeModal();
+    activeModalOnClose = onClose || null;
 
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
@@ -90,6 +92,8 @@ const App = (() => {
 
   function closeModal() {
     if (!activeModal) return;
+    activeModalOnClose?.();
+    activeModalOnClose = null;
     activeModal.classList.remove('open');
     setTimeout(() => { activeModal?.remove(); activeModal = null; }, 300);
     document.removeEventListener('keydown', handleEsc);
