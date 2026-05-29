@@ -22,6 +22,16 @@ const AnalyticsModule = (() => {
     return s.includes('degustac');
   }
 
+  // Extrae el texto de sabor de un item: usa flavor si existe,
+  // sino intenta parsear "Formato — Sabor" de name
+  function getFlavorText(item) {
+    const f = (item.flavor || '').trim();
+    if (f) return f;
+    const parts = (item.name || '').split(/\s*[—–-]\s*/);
+    // Si hay dos partes, la segunda es el sabor; si hay una sola, probamos esa
+    return parts.length > 1 ? parts[1].trim() : '';
+  }
+
   // ─── Zonas fijas ──────────────────────────────────────────────────────────────
   const ZONES_FIXED = [
     'Barrio de Villa Nueva',
@@ -63,11 +73,33 @@ const AnalyticsModule = (() => {
     }).join('');
   }
 
+  // Extrae el barrio de Villa Nueva del campo zone.
+  // Formato esperado: "Barrio de Villa Nueva - San Marco" o "Barrio de Villa Nueva - San Marco Lote 5"
+  function extractBarrioFromZone(zone) {
+    const z = (zone || '').trim();
+    if (!z.toLowerCase().includes('villa nueva')) return null;
+    const sep = z.indexOf(' - ');
+    if (sep === -1) return null;
+    const raw = z.substring(sep + 3).trim(); // "San Marco" o "San Marco Lote 5"
+    if (!raw) return null;
+
+    // Intenta hacer match con barrios conocidos primero
+    const knownBarrios = Store.barriosVN.all();
+    for (const b of knownBarrios) {
+      if (raw.toLowerCase().startsWith(b.name.toLowerCase())) return b.name;
+    }
+
+    // Si no matchea, corta en "Lote", número suelto, o segundo guión
+    const cutMatch = raw.match(/^(.*?)\s+(lote\s*\d|lt\.?\s*\d|\d)/i);
+    return cutMatch ? cutMatch[1].trim() : raw;
+  }
+
   // ─── Cómputo ──────────────────────────────────────────────────────────────────
   function computeData() {
     const orders = Store.orders.all();
 
     // Sabores: normalización a los 4 canónicos
+    // Usa getFlavorText para cubrir tanto item.flavor como item.name con " — "
     // Degustación cuenta como 1 de cada sabor × qty
     const flavorMap = { 'Romero y Sal': 0, 'Papa y Parmesano': 0, 'Tomate Cherry y Pesto': 0, 'Aceitunas': 0 };
     orders.forEach(o => {
@@ -75,20 +107,18 @@ const AnalyticsModule = (() => {
         if ((item.format || '').toLowerCase() === 'promo') return;
         const qty = item.qty || 1;
         if (isDegustacion(item)) {
-          // degustación = 1 de cada sabor
-          FLAVORS_FIXED.forEach(fl => { flavorMap[fl] = (flavorMap[fl] || 0) + qty; });
+          FLAVORS_FIXED.forEach(fl => { flavorMap[fl] += qty; });
           return;
         }
-        const cf = canonicalFlavor(item.flavor);
-        if (cf) flavorMap[cf] = (flavorMap[cf] || 0) + qty;
+        const cf = canonicalFlavor(getFlavorText(item));
+        if (cf) flavorMap[cf] += qty;
       });
     });
-    // Mostrar siempre los 4, ordenados de mayor a menor
     const flavors = FLAVORS_FIXED
-      .map(f => [f, flavorMap[f] || 0])
+      .map(f => [f, flavorMap[f]])
       .sort((a, b) => b[1] - a[1]);
 
-    // Zonas: siempre las 6 fijas, más "sin zona" si hay pedidos sin zona
+    // Zonas: siempre las 6 fijas con conteo
     const zoneMap = {};
     ZONES_FIXED.forEach(z => { zoneMap[z] = 0; });
     orders.forEach(o => {
@@ -97,11 +127,11 @@ const AnalyticsModule = (() => {
     });
     const zones = Object.entries(zoneMap).sort((a, b) => b[1] - a[1]);
 
-    // Barrios (Villa Nueva): desde la colección barriosVN + conteo de pedidos
+    // Barrios: extrae desde o.barrio (campo manual) o desde o.zone para Villa Nueva
     const knownBarrios = Store.barriosVN.all();
     const barrioOrderMap = {};
     orders.forEach(o => {
-      const b = (o.barrio || '').trim();
+      const b = (o.barrio || '').trim() || extractBarrioFromZone(o.zone) || '';
       if (b) barrioOrderMap[b] = (barrioOrderMap[b] || 0) + 1;
     });
     const barrios = knownBarrios.map(b => [b.name, b.id, barrioOrderMap[b.name] || 0]);
