@@ -443,6 +443,7 @@ const FinancesModule = (() => {
               <div class="card-subtitle">Todos los gastos ingresados</div>
             </div>
             <div class="d-flex gap-2">
+              <button class="btn btn-ghost btn-sm" onclick="FinancesModule.clearAllExpenses()" style="color:var(--color-danger)">Eliminar todos</button>
               <button class="btn btn-ghost btn-sm" onclick="FinancesModule.openWithReceipt()">Subir comprobante</button>
               <button class="btn btn-sm btn-primary" onclick="FinancesModule.importFromExcel()">Importar Excel</button>
             </div>
@@ -463,5 +464,14 @@ const FinancesModule = (() => {
     `;
   }
 
-  return { render, openCreateModal, openEditExpense, removeExpense, importFromExcel, openWithReceipt };
+  function clearAllExpenses() {
+    const count = Store.expenses.count();
+    if (!count) { App.toast('error', 'No hay gastos para eliminar'); return; }
+    if (!confirm(`¿Eliminás los ${count} gastos registrados? Esta acción no se puede deshacer.`)) return;
+    Store.expenses.all().forEach(e => Store.expenses.remove(e.id));
+    App.toast('success', `${count} gasto${count !== 1 ? 's' : ''} eliminado${count !== 1 ? 's' : ''}`);
+    render(document.getElementById('pageContent'));
+  }
+
+  return { render, openCreateModal, openEditExpense, removeExpense, importFromExcel, openWithReceipt, clearAllExpenses };
 })();
