@@ -22,14 +22,14 @@ const AnalyticsModule = (() => {
     return s.includes('degustac');
   }
 
-  // Extrae el texto de sabor de un item: usa flavor si existe,
-  // sino intenta parsear "Formato — Sabor" de name
+  // Extrae el sabor de un item.
+  // Formato esperado: "Familiar (Papa y Parmesano (Sin individual de regalo))"
+  // → toma el primer bloque entre paréntesis, antes de sub-paréntesis.
   function getFlavorText(item) {
     const f = (item.flavor || '').trim();
     if (f) return f;
-    const parts = (item.name || '').split(/\s*[—–-]\s*/);
-    // Si hay dos partes, la segunda es el sabor; si hay una sola, probamos esa
-    return parts.length > 1 ? parts[1].trim() : '';
+    const m = (item.name || '').match(/\(([^(]+)/);
+    return m ? m[1].trim() : '';
   }
 
   // ─── Zonas fijas ──────────────────────────────────────────────────────────────
@@ -91,9 +91,8 @@ const AnalyticsModule = (() => {
       if (raw.toLowerCase().startsWith(b.name.toLowerCase())) return b.name;
     }
 
-    // Si no matchea, corta en "Lote", número suelto, o segundo guión
-    const cutMatch = raw.match(/^(.*?)\s+(lote\s*\d|lt\.?\s*\d|\d)/i);
-    return cutMatch ? cutMatch[1].trim() : raw;
+    // Si no matchea ningún barrio conocido, no asumir — podría ser texto libre de entrega
+    return null;
   }
 
   // ─── Cómputo ──────────────────────────────────────────────────────────────────
@@ -106,12 +105,14 @@ const AnalyticsModule = (() => {
     const flavorMap = { 'Romero y Sal': 0, 'Papa y Parmesano': 0, 'Tomate Cherry y Pesto': 0, 'Aceitunas': 0 };
     orders.forEach(o => {
       (o.items || []).forEach(item => {
-        if ((item.format || '').toLowerCase() === 'promo') return;
         const qty = item.qty || 1;
+        // Degustación antes del filtro de promos — puede venir con format 'Promo'
         if (isDegustacion(item)) {
           FLAVORS_FIXED.forEach(fl => { flavorMap[fl] += qty; });
           return;
         }
+        // Saltear promos que no son degustación (Promo, Promo25, etc.)
+        if ((item.format || '').toLowerCase().startsWith('promo')) return;
         const cf = canonicalFlavor(getFlavorText(item));
         if (cf) flavorMap[cf] += qty;
       });

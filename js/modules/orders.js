@@ -8,6 +8,21 @@ const OrdersModule = (() => {
   };
 
   function fmt(n) { return '$' + n.toLocaleString('es-AR'); }
+
+  const ZONE_OPTS = ['Barrio de Villa Nueva','Vila Terra','Centro Comercial Nordelta','Lirios del Talar','Terrazas/Casas de Santa Maria','Talar del lago 2','Otro'];
+  function normalizeZoneSelect(raw) {
+    const z = (raw || '').trim();
+    if (!z) return '';
+    if (ZONE_OPTS.includes(z)) return z;
+    const zl = z.toLowerCase();
+    if (zl.includes('villa nueva'))                                                        return 'Barrio de Villa Nueva';
+    if (zl.includes('terra') || zl.includes('vila'))                                       return 'Vila Terra';
+    if (zl.includes('nordelta'))                                                            return 'Centro Comercial Nordelta';
+    if (zl.includes('lirios'))                                                              return 'Lirios del Talar';
+    if (zl.includes('santa maria') || zl.includes('terraza') || zl.includes('santa maría')) return 'Terrazas/Casas de Santa Maria';
+    if (zl.includes('talar del lago'))                                                      return 'Talar del lago 2';
+    return 'Otro';
+  }
   function statusBadge(s) {
     const { badge, label } = STATUS_MAP[s] || { badge: 'badge-default', label: s };
     return `<span class="badge ${badge}">${label}</span>`;
@@ -309,8 +324,8 @@ const OrdersModule = (() => {
               <label class="form-label">Zona de entrega</label>
               <select class="form-select" id="dOrderZone">
                 <option value="">Sin zona</option>
-                ${['Barrio de Villa Nueva','Vila Terra','Centro Comercial Nordelta','Lirios del Talar','Terrazas/Casas de Santa Maria','Talar del lago 2','Otro'].map(z =>
-                  `<option value="${z}" ${o.zone === z ? 'selected' : ''}>${z}</option>`
+                ${ZONE_OPTS.map(z =>
+                  `<option value="${z}" ${normalizeZoneSelect(o.zone) === z ? 'selected' : ''}>${z}</option>`
                 ).join('')}
               </select>
             </div>
