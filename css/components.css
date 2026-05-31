@@ -691,6 +691,71 @@
   color: var(--color-danger);
 }
 
+/* === MOBILE === */
+@media (max-width: 768px) {
+  /* Modal: sube desde abajo */
+  .modal-backdrop {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-height: 92vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+
+  .modal-lg {
+    max-width: 100%;
+  }
+
+  /* Toast: ancho completo en la parte baja */
+  .toast-container {
+    bottom: var(--space-3);
+    right: var(--space-3);
+    left: var(--space-3);
+    max-width: none;
+  }
+
+  /* Cards: menos padding */
+  .card {
+    padding: var(--space-4);
+  }
+
+  .card-header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* Tabs: scroll horizontal en lugar de cortar */
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  /* Botones de acción en headers: reducir */
+  .btn-sm {
+    font-size: 11px;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  /* Form rows: siempre una columna */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Tablas dentro de cards: scroll horizontal */
+  .table-wrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Stat card padding */
+  .stat-card {
+    padding: var(--space-4);
+  }
+}
+
 /* === CHECKBOXES EN MODAL PROMOS === */
 .checkbox-grid {
   display: grid;
