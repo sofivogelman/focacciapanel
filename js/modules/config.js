@@ -18,6 +18,29 @@ const ConfigModule = (() => {
       <div id="cfgPromos" style="margin-top:var(--space-6)"></div>
       <div id="cfgRecipes" style="margin-top:var(--space-6)"></div>
       <div id="cfgPromoStats" style="margin-top:var(--space-6)"></div>
+
+      <!-- Sincronización Google Drive -->
+      <div class="card" style="margin-top:var(--space-6)">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Sincronización entre dispositivos</div>
+            <div class="card-subtitle">Guardá o cargá todos los datos vía Google Drive para usarlos desde cualquier dispositivo</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+          <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="DriveSync.upload()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+              Guardar en Drive
+            </button>
+            <button class="btn btn-secondary" onclick="DriveSync.download()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.11"/></svg>
+              Cargar desde Drive
+            </button>
+          </div>
+          <p class="text-xs text-muted">Al guardar se sube un archivo <code>focaccia-panel-data.json</code> a tu Google Drive. Al cargar se reemplaza toda la información local con la versión del Drive y la página se recarga.</p>
+        </div>
+      </div>
     `;
     renderFlavors();
     renderFormats();
