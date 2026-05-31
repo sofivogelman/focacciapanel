@@ -13,7 +13,7 @@ const InventoryModule = (() => {
     return `
       <tr>
         <td class="font-medium">${i.name}</td>
-        <td><span class="badge badge-default">${CATS[i.category] || i.category}</span></td>
+        <td class="td-hide-mobile"><span class="badge badge-default">${CATS[i.category] || i.category}</span></td>
         <td>
           <div class="d-flex items-center gap-3">
             <div class="progress" style="width: 80px">
@@ -22,8 +22,8 @@ const InventoryModule = (() => {
             <span class="text-sm font-medium">${i.stock} ${i.unit}</span>
           </div>
         </td>
-        <td class="text-secondary text-sm">${i.minStock} ${i.unit}</td>
-        <td class="text-secondary text-sm">$${i.cost.toLocaleString('es-AR')} / ${i.unit}</td>
+        <td class="td-hide-mobile text-secondary text-sm">${i.minStock} ${i.unit}</td>
+        <td class="td-hide-mobile text-secondary text-sm">$${i.cost.toLocaleString('es-AR')} / ${i.unit}</td>
         <td><span class="badge ${st.cls}">${st.label}</span></td>
         <td>
           <div class="d-flex gap-1">
@@ -173,10 +173,10 @@ const InventoryModule = (() => {
             <thead>
               <tr>
                 <th>Ingrediente</th>
-                <th>Categoría</th>
+                <th class="th-hide-mobile">Categoría</th>
                 <th>Stock actual</th>
-                <th>Mínimo</th>
-                <th>Costo</th>
+                <th class="th-hide-mobile">Mínimo</th>
+                <th class="th-hide-mobile">Costo</th>
                 <th>Estado</th>
                 <th></th>
               </tr>

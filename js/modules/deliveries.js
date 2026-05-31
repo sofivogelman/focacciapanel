@@ -293,7 +293,7 @@ const DeliveriesModule = (() => {
           <div class="table-wrapper" style="border:none;margin:calc(-1 * var(--space-4)) calc(-1 * var(--space-6));border-radius:0">
             <table class="table">
               <thead>
-                <tr><th>Fecha</th><th>Recorrido</th><th>Km</th><th>Litros</th><th>Costo nafta</th><th></th></tr>
+                <tr><th>Fecha</th><th>Recorrido</th><th>Km</th><th class="th-hide-mobile">Litros</th><th>Costo nafta</th><th></th></tr>
               </thead>
               <tbody>
                 ${deliveries.length === 0 ? `
@@ -311,7 +311,7 @@ const DeliveriesModule = (() => {
                       <td class="text-sm">${d.date}</td>
                       <td class="text-sm text-secondary" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${route}">${route}</td>
                       <td class="font-medium">${d.totalKm} km</td>
-                      <td class="text-sm text-secondary">${d.liters} L</td>
+                      <td class="td-hide-mobile text-sm text-secondary">${d.liters} L</td>
                       <td class="font-medium">$${d.fuelCost.toLocaleString('es-AR')}</td>
                       <td>
                         <button class="btn btn-ghost btn-icon btn-sm" onclick="DeliveriesModule.remove(${d.id})">

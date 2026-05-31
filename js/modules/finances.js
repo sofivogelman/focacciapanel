@@ -19,7 +19,7 @@ const FinancesModule = (() => {
       <tr>
         <td class="text-secondary text-sm">${e.date}</td>
         <td class="font-medium">${e.description}</td>
-        <td><span class="badge badge-default">${EXP_CATS[e.category] || e.category}</span></td>
+        <td class="td-hide-mobile"><span class="badge badge-default">${EXP_CATS[e.category] || e.category}</span></td>
         <td class="font-medium text-danger">${fmt(e.amount)}</td>
         <td>
           <div class="d-flex gap-1">
@@ -499,7 +499,7 @@ const FinancesModule = (() => {
           <div class="table-wrapper" style="border:none; margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-6)); border-radius: 0">
             <table class="table">
               <thead>
-                <tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Monto</th><th></th></tr>
+                <tr><th>Fecha</th><th>Descripción</th><th class="th-hide-mobile">Categoría</th><th>Monto</th><th></th></tr>
               </thead>
               <tbody>
                 ${Store.expenses.all().sort((a,b) => b.date.localeCompare(a.date)).map(renderExpRow).join('')}

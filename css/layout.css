@@ -300,6 +300,48 @@
   .stat-value {
     font-size: var(--text-2xl);
   }
+
+  /* Columnas ocultas en mobile */
+  .th-hide-mobile,
+  .td-hide-mobile {
+    display: none;
+  }
+
+  /* Barra de filtros de pedidos */
+  #ordersFilterBar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--space-2) !important;
+  }
+
+  #ordersFilterBar .search-wrapper {
+    width: 100% !important;
+    max-width: none !important;
+    margin-left: 0 !important;
+  }
+
+  #ordersFilterBar .tabs {
+    border-bottom: var(--border);
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  /* Buscadores con ancho fijo inline */
+  .search-wrapper {
+    max-width: 100% !important;
+  }
+
+  /* Card headers con muchos botones */
+  .card-header {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  /* Grid 2 columnas con estilos inline */
+  .grid-2,
+  .config-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 .sidebar-overlay {

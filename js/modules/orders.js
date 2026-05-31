@@ -45,7 +45,7 @@ const OrdersModule = (() => {
     const itemSummary = o.items.map(i => `${i.qty}x ${i.name}`).join(', ');
     return `
       <tr>
-        <td><span class="text-muted text-xs">#</span><span class="font-medium">${o.id}</span></td>
+        <td class="td-hide-mobile"><span class="text-muted text-xs">#</span><span class="font-medium">${o.id}</span></td>
         <td>
           <div class="font-medium">${o.clientName}</div>
           <div class="text-xs text-secondary">${itemSummary.length > 40 ? itemSummary.slice(0,40)+'…' : itemSummary}</div>
@@ -53,7 +53,7 @@ const OrdersModule = (() => {
         <td class="text-secondary text-sm">${o.deliveryDate}${o.deliveryTime ? ' ' + o.deliveryTime : ''}</td>
         <td>${statusBadge(o.status)}</td>
         <td class="font-medium">${fmt(o.total)}</td>
-        <td>
+        <td class="td-hide-mobile">
           <span class="badge ${o.paid ? 'badge-success' : 'badge-default'}">${o.paid ? 'Cobrado' : 'Pendiente'}</span>
         </td>
         <td>
@@ -462,7 +462,7 @@ const OrdersModule = (() => {
         </div>
 
         <!-- Filters -->
-        <div class="d-flex gap-3 items-center" style="margin-bottom: var(--space-6); flex-wrap: wrap">
+        <div id="ordersFilterBar" class="d-flex gap-3 items-center" style="margin-bottom: var(--space-6); flex-wrap: wrap">
           <div class="tabs" style="margin-bottom: 0; border-bottom: none; gap: var(--space-1)">
             ${[['all','Todos'], ['pendiente','Pendientes'], ['en_preparacion','En preparación'], ['listo','Listos'], ['entregado','Entregados']].map(([val, lbl]) => `
               <div class="tab-item ${activeFilter === val ? 'active' : ''}" onclick="OrdersModule.setFilter('${val}')">${lbl}</div>
@@ -479,12 +479,12 @@ const OrdersModule = (() => {
           <table class="table">
             <thead>
               <tr>
-                <th>#</th>
+                <th class="th-hide-mobile">#</th>
                 <th>Cliente / Productos</th>
                 <th>Entrega</th>
                 <th>Estado</th>
                 <th>Total</th>
-                <th>Pago</th>
+                <th class="th-hide-mobile">Pago</th>
                 <th></th>
               </tr>
             </thead>
