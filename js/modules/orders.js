@@ -431,8 +431,9 @@ const OrdersModule = (() => {
       `,
       primaryLabel: 'Guardar cambios',
       onConfirm: () => {
+        const newStatus = document.getElementById('dOrderStatus').value;
         Store.orders.update(id, {
-          status:        document.getElementById('dOrderStatus').value,
+          status:        newStatus,
           deliveryDate:  document.getElementById('dOrderDelivery').value,
           deliveryTime:  document.getElementById('dOrderDeliveryTime').value,
           paymentMethod: document.getElementById('dOrderPayment').value,
@@ -441,11 +442,49 @@ const OrdersModule = (() => {
           barrio:        document.getElementById('dOrderBarrio').value.trim(),
           lote:          document.getElementById('dOrderLote').value.trim(),
         });
+
+        if (newStatus === 'en_preparacion' && !o.inventoryDeducted) {
+          const updated  = Store.orders.find(id);
+          const deducted = deductToppings(updated);
+          if (deducted.length > 0) {
+            App.toast('success', `Toppings descontados: ${deducted.join(', ')}`);
+          } else if (Store.flavorRecipes.count() === 0) {
+            App.toast('error', 'No hay recetas de toppings definidas — configuralas en Configuración');
+          }
+        }
+
         refreshTable();
         App.toast('success', 'Pedido actualizado');
         return true;
       },
     });
+  }
+
+  function deductToppings(order) {
+    if (order.inventoryDeducted) return [];
+    const flavorRecipes = Store.flavorRecipes.all();
+    if (!flavorRecipes.length) return [];
+
+    const totalNeeded = {};
+    (order.items || []).forEach(item => {
+      const flavorName = (item.flavor || '').trim().toLowerCase();
+      const qty        = item.qty || 1;
+      flavorRecipes
+        .filter(r => (r.flavorName || '').toLowerCase() === flavorName)
+        .forEach(r => { totalNeeded[r.ingredientId] = (totalNeeded[r.ingredientId] || 0) + r.qty * qty; });
+    });
+
+    const deducted = [];
+    Object.entries(totalNeeded).forEach(([ingId, qty]) => {
+      const ing = Store.ingredients.find(parseInt(ingId));
+      if (!ing) return;
+      const newStock = Math.max(0, Math.round((ing.stock - qty) * 100) / 100);
+      Store.ingredients.update(ing.id, { stock: newStock });
+      deducted.push(`${ing.name} −${qty}${ing.unit}`);
+    });
+
+    if (deducted.length > 0) Store.orders.update(order.id, { inventoryDeducted: true });
+    return deducted;
   }
 
   function remove(id) {

@@ -288,14 +288,28 @@ const ProductionModule = (() => {
       }
     });
 
-    // Descontar harina del inventario
-    const harinaIng = Store.ingredients.where(i => i.name.toLowerCase().includes('harina'));
-    if (harinaIng.length > 0) {
-      const ing       = harinaIng[0];
-      const deduccion = ing.unit.toLowerCase().startsWith('g') ? totalBolsas * 1000 : totalBolsas;
-      const newStock  = Math.max(0, Math.round((ing.stock - deduccion) * 100) / 100);
+    // Descontar TODOS los ingredientes de masa según las unidades reales de cada día
+    const totalNeeded = {};
+    dist.forEach(d => {
+      if (d.bolsasAsig <= 0) return;
+      const day = plan.find(p => p.date === d.date);
+      if (!day) return;
+      const { familiares, individuales, regalo } = day.counts;
+      ['familiar', 'individual'].forEach(fmt => {
+        const units = fmt === 'familiar' ? familiares : (individuales + regalo);
+        if (!units) return;
+        Store.recipes.where(r => r.formatName.toLowerCase() === fmt).forEach(r => {
+          totalNeeded[r.ingredientId] = (totalNeeded[r.ingredientId] || 0) + r.qty * units;
+        });
+      });
+    });
+
+    Object.entries(totalNeeded).forEach(([ingId, qty]) => {
+      const ing = Store.ingredients.find(parseInt(ingId));
+      if (!ing) return;
+      const newStock = Math.max(0, Math.round((ing.stock - qty) * 100) / 100);
       Store.ingredients.update(ing.id, { stock: newStock });
-    }
+    });
 
     const cubiertos = dist.filter(d => d.cubierto && d.bolsasAsig > 0).length;
     App.toast('success', `${totalBolsas} bolsa${totalBolsas !== 1 ? 's' : ''} distribuida${totalBolsas !== 1 ? 's' : ''} · ${cubiertos} día${cubiertos !== 1 ? 's' : ''} cubierto${cubiertos !== 1 ? 's' : ''}`);

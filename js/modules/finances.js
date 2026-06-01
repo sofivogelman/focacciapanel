@@ -36,13 +36,16 @@ const FinancesModule = (() => {
   }
 
   function buildExpenseForm(e = null) {
-    const isEdit = !!e;
+    const isEdit    = !!e;
+    const isCat     = isEdit ? e.category : 'ingredientes';
+    const showStock = !isEdit;
+    const ingredients = Store.ingredients.all().sort((a, b) => a.name.localeCompare(b.name));
     return `
       <div class="form-group">
         <label class="form-label">Descripción *</label>
         <input class="form-input" id="fExpDesc" value="${isEdit ? e.description : ''}" placeholder="Compra de harina, gas, etc." list="expIngredientsList" autocomplete="off" required />
         <datalist id="expIngredientsList">
-          ${Store.ingredients.all().map(i => `<option value="${i.name}">`).join('')}
+          ${ingredients.map(i => `<option value="${i.name}">`).join('')}
         </datalist>
       </div>
       <div class="form-row">
@@ -52,11 +55,33 @@ const FinancesModule = (() => {
         </div>
         <div class="form-group">
           <label class="form-label">Categoría</label>
-          <select class="form-select" id="fExpCat">
-            ${Object.entries(EXP_CATS).map(([k,v]) => `<option value="${k}" ${isEdit && e.category===k?'selected':''}>${v}</option>`).join('')}
+          <select class="form-select" id="fExpCat" onchange="FinancesModule.toggleStockFields()">
+            ${Object.entries(EXP_CATS).map(([k,v]) => `<option value="${k}" ${(isEdit ? e.category : 'ingredientes') === k ? 'selected' : ''}>${v}</option>`).join('')}
           </select>
         </div>
       </div>
+
+      ${showStock ? `
+      <div id="fExpStockGroup" style="background:var(--color-primary-subtle);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);display:${isCat === 'ingredientes' ? 'block' : 'none'}">
+        <div class="text-xs font-semibold" style="color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--space-3)">Actualizar inventario (opcional)</div>
+        <div class="form-row">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Ingrediente comprado</label>
+            <select class="form-select" id="fExpIng" onchange="FinancesModule.onIngredientChange()">
+              <option value="">— No actualizar stock —</option>
+              ${ingredients.map(i => `<option value="${i.id}" data-unit="${i.unit}">
+                ${i.name} (stock actual: ${i.stock} ${i.unit})
+              </option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" id="fExpQtyGroup" style="margin-bottom:0;display:none">
+            <label class="form-label">Cantidad comprada (<span id="fExpIngUnit">unidad</span>)</label>
+            <input type="number" class="form-input" id="fExpQty" min="0" step="0.01" placeholder="0" />
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Fecha</label>
@@ -81,6 +106,22 @@ const FinancesModule = (() => {
     `;
   }
 
+  function toggleStockFields() {
+    const cat   = document.getElementById('fExpCat')?.value;
+    const group = document.getElementById('fExpStockGroup');
+    if (group) group.style.display = cat === 'ingredientes' ? 'block' : 'none';
+  }
+
+  function onIngredientChange() {
+    const sel     = document.getElementById('fExpIng');
+    const opt     = sel?.options[sel.selectedIndex];
+    const unit    = opt?.dataset.unit || '';
+    const qtyGrp  = document.getElementById('fExpQtyGroup');
+    const unitLbl = document.getElementById('fExpIngUnit');
+    if (qtyGrp)  qtyGrp.style.display  = opt?.value ? 'block' : 'none';
+    if (unitLbl) unitLbl.textContent    = unit;
+  }
+
   function saveExpense(editId) {
     const desc   = document.getElementById('fExpDesc').value.trim();
     const amount = parseFloat(document.getElementById('fExpAmount').value);
@@ -92,9 +133,21 @@ const FinancesModule = (() => {
     } else {
       const installments = parseInt(document.getElementById('fExpInstallments')?.value || '1') || 1;
       createInstallments(base, installments);
-      App.toast('success', installments > 1 ? `Gasto en ${installments} cuotas registrado` : 'Gasto registrado');
+
+      // Actualizar stock del ingrediente si se seleccionó uno
+      const ingId = parseInt(document.getElementById('fExpIng')?.value || '0');
+      const qty   = parseFloat(document.getElementById('fExpQty')?.value || '0');
+      if (ingId && qty > 0) {
+        const ing = Store.ingredients.find(ingId);
+        if (ing) {
+          const newStock = Math.round((ing.stock + qty) * 100) / 100;
+          Store.ingredients.update(ingId, { stock: newStock });
+          App.toast('success', `Stock de ${ing.name}: +${qty} ${ing.unit} → ${newStock} ${ing.unit}`);
+        }
+      } else {
+        App.toast('success', installments > 1 ? `Gasto en ${installments} cuotas registrado` : 'Gasto registrado');
+      }
     }
-    // Si estamos en finanzas re-renderizamos; si no (ej. dashboard) solo se guarda y listo
     if (Router.current() === 'finances') render(document.getElementById('pageContent'));
     return true;
   }
@@ -274,6 +327,7 @@ const FinancesModule = (() => {
 
   // ─── Comprobante (imagen / PDF) ───────────────────────────────────────────────
   const GEMINI_KEY_LS = 'focaccia_gemini_key';
+  let _rrc = 0; // receipt row counter for unique IDs
 
   function getGeminiKey() {
     return localStorage.getItem(GEMINI_KEY_LS) || '';
@@ -287,7 +341,7 @@ const FinancesModule = (() => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [
-          { text: 'Sos un asistente para una emprendedora. Analizá este ticket/factura y extraé: 1) el monto TOTAL final (solo el número entero en pesos argentinos, sin separadores ni símbolos), 2) una descripción breve del comercio o tipo de gasto. Respondé SOLO con JSON así: {"monto":1234,"descripcion":"nombre del comercio"} Sin markdown ni texto adicional.' },
+          { text: 'Sos un asistente para una emprendedora de focaccia argentina. Analizá este ticket/factura y extraé CADA ITEM por separado con su precio individual. Para cada item intentá identificar si es un ingrediente de panadería/cocina (harina, aceite, levadura, sal, azúcar, tomate, queso, papa, romero, etc.) e indicá la cantidad y unidad si aparece en el texto (ej: 2kg → cantidad:2000, unidad:"g"). Respondé SOLO con un JSON array sin markdown: [{"descripcion":"nombre del producto","monto":1234,"ingrediente":"nombre si es ingrediente o null","cantidad":null,"unidad":null}]. Si no podés separar items, devolvé el total como un solo objeto en el array.' },
           { inline_data: { mime_type: mimeType, data: base64Data } }
         ]}]
       }),
@@ -297,27 +351,144 @@ const FinancesModule = (() => {
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     try {
       const cleaned = text.replace(/```json|```/g, '').trim();
-      return JSON.parse(cleaned);
+      const parsed  = JSON.parse(cleaned);
+      return Array.isArray(parsed) ? parsed : [parsed];
     } catch { App.toast('error', 'No se pudo leer la respuesta de Gemini'); return null; }
   }
 
+  function _receiptIngOptions(selectedId) {
+    const ingredients = Store.ingredients.all().sort((a, b) => a.name.localeCompare(b.name));
+    return `<option value="">— No actualizar stock —</option>` +
+      ingredients.map(i =>
+        `<option value="${i.id}" data-unit="${i.unit}" ${i.id === selectedId ? 'selected' : ''}>${i.name} (${i.stock} ${i.unit})</option>`
+      ).join('');
+  }
+
+  function _tryMatchIngredient(nombre) {
+    if (!nombre) return null;
+    const lower = (nombre || '').toLowerCase();
+    return Store.ingredients.all().find(i => lower.includes(i.name.toLowerCase().slice(0, 5))) || null;
+  }
+
+  function addReceiptRow(item = {}) {
+    const list  = document.getElementById('receiptItemsList');
+    if (!list) return;
+    const idx   = _rrc++;
+    const match = item.ingrediente ? _tryMatchIngredient(item.ingrediente) : null;
+    const div   = document.createElement('div');
+    div.id        = `rrow_${idx}`;
+    div.className = 'receipt-item-row';
+    div.style     = 'border-bottom:var(--border-light);padding:var(--space-3) 0;display:flex;flex-direction:column;gap:var(--space-2)';
+    div.innerHTML = `
+      <div class="d-flex gap-2 items-center">
+        <input type="text" class="form-input flex-1" id="riDesc_${idx}"
+          value="${(item.descripcion || '').replace(/"/g, '&quot;')}" placeholder="Descripción del item" style="height:34px" />
+        <input type="number" class="form-input" id="riMonto_${idx}"
+          value="${item.monto || ''}" min="0" step="1" placeholder="$0"
+          style="width:100px;height:34px;text-align:right"
+          oninput="FinancesModule.recalcReceiptTotal()" />
+        <button class="btn btn-ghost btn-icon btn-sm" title="Eliminar"
+          onclick="document.getElementById('rrow_${idx}').remove();FinancesModule.recalcReceiptTotal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="d-flex gap-2 items-center" style="padding-left:2px">
+        <select class="form-select" id="riIng_${idx}" style="height:30px;font-size:var(--text-xs);flex:1"
+          onchange="FinancesModule.onReceiptIngChange(${idx})">
+          ${_receiptIngOptions(match?.id)}
+        </select>
+        <input type="number" class="form-input" id="riQty_${idx}" min="0" step="0.01"
+          placeholder="Cantidad" value="${item.cantidad || ''}"
+          style="width:90px;height:30px;font-size:var(--text-xs);display:${match ? 'block' : 'none'}" />
+        <span class="text-xs text-muted" id="riUnit_${idx}" style="white-space:nowrap;display:${match ? 'inline' : 'none'}">${match?.unit || ''}</span>
+      </div>
+    `;
+    list.appendChild(div);
+    recalcReceiptTotal();
+  }
+
+  function onReceiptIngChange(idx) {
+    const sel  = document.getElementById(`riIng_${idx}`);
+    const opt  = sel?.options[sel.selectedIndex];
+    const unit = opt?.dataset.unit || '';
+    const show = !!opt?.value;
+    const qty  = document.getElementById(`riQty_${idx}`);
+    const lbl  = document.getElementById(`riUnit_${idx}`);
+    if (qty) qty.style.display = show ? 'block' : 'none';
+    if (lbl) { lbl.style.display = show ? 'inline' : 'none'; lbl.textContent = unit; }
+  }
+
+  function recalcReceiptTotal() {
+    let total = 0;
+    document.querySelectorAll('[id^="riMonto_"]').forEach(el => {
+      total += parseFloat(el.value) || 0;
+    });
+    const el = document.getElementById('receiptGrandTotal');
+    if (el) el.textContent = fmt(total);
+  }
+
+  function saveReceiptItems() {
+    const date = document.getElementById('rDate')?.value || new Date().toISOString().slice(0, 10);
+    const cat  = document.getElementById('rCat')?.value  || 'ingredientes';
+    const rows = document.querySelectorAll('.receipt-item-row');
+    if (!rows.length) { App.toast('error', 'Agregá al menos un item'); return false; }
+
+    let saved = 0;
+    let stockMsgs = [];
+
+    rows.forEach(row => {
+      const idMatch = row.id.match(/rrow_(\d+)/);
+      if (!idMatch) return;
+      const idx   = idMatch[1];
+      const desc  = document.getElementById(`riDesc_${idx}`)?.value.trim();
+      const monto = parseFloat(document.getElementById(`riMonto_${idx}`)?.value);
+      if (!desc || !monto || monto <= 0) return;
+
+      Store.expenses.create({ description: desc, amount: monto, category: cat, date });
+      saved++;
+
+      const ingId = parseInt(document.getElementById(`riIng_${idx}`)?.value || '0');
+      const qty   = parseFloat(document.getElementById(`riQty_${idx}`)?.value  || '0');
+      if (ingId && qty > 0) {
+        const ing = Store.ingredients.find(ingId);
+        if (ing) {
+          const newStock = Math.round((ing.stock + qty) * 100) / 100;
+          Store.ingredients.update(ingId, { stock: newStock });
+          stockMsgs.push(`${ing.name} +${qty}${ing.unit}`);
+        }
+      }
+    });
+
+    if (!saved) { App.toast('error', 'Ningún item tiene descripción y monto'); return false; }
+
+    App.toast('success', `${saved} gasto${saved !== 1 ? 's' : ''} registrado${saved !== 1 ? 's' : ''}${stockMsgs.length ? ' · Stock: ' + stockMsgs.join(', ') : ''}`);
+    render(document.getElementById('pageContent'));
+    return true;
+  }
+
   function openWithReceipt() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*,application/pdf';
+    const input   = document.createElement('input');
+    input.type    = 'file';
+    input.accept  = 'image/*,application/pdf';
     input.capture = 'environment';
     input.onchange = e => {
       const file = e.target.files[0];
       if (!file) return;
-      const url = URL.createObjectURL(file);
-      const isPDF = file.type === 'application/pdf';
+      const url       = URL.createObjectURL(file);
+      const isPDF     = file.type === 'application/pdf';
       const hasGemini = !!getGeminiKey();
+      _rrc = 0;
+
+      const catOptions = Object.entries(EXP_CATS)
+        .map(([k, v]) => `<option value="${k}" ${k === 'ingredientes' ? 'selected' : ''}>${v}</option>`).join('');
 
       App.openModal({
         title: 'Cargar comprobante',
         size: 'modal-lg',
         body: `
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5);align-items:start" class="receipt-grid">
+
+            <!-- Imagen -->
             <div style="display:flex;flex-direction:column;gap:var(--space-3)">
               <div style="background:var(--color-border-light);border-radius:var(--radius-sm);overflow:hidden;min-height:160px;display:flex;align-items:center;justify-content:center">
                 ${isPDF
@@ -327,42 +498,65 @@ const FinancesModule = (() => {
               </div>
               ${!isPDF ? `
                 <button class="btn btn-secondary btn-sm" id="btnDetectar" ${!hasGemini ? 'disabled title="Configurá tu clave Gemini primero"' : ''}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                  Auto-detectar monto con IA
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/></svg>
+                  Auto-detectar items con IA
                 </button>
                 ${!hasGemini ? '<div class="form-hint">Configurá tu clave Gemini en Configuración para usar esta función.</div>' : ''}
               ` : ''}
             </div>
+
+            <!-- Items -->
             <div>
-              <div class="form-hint" style="margin-bottom:var(--space-4)">Mirá el comprobante y completá los datos del gasto.</div>
-              ${buildExpenseForm()}
+              <div class="form-row" style="margin-bottom:var(--space-4)">
+                <div class="form-group">
+                  <label class="form-label">Fecha</label>
+                  <input type="date" class="form-input" id="rDate" value="${new Date().toISOString().slice(0,10)}" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Categoría</label>
+                  <select class="form-select" id="rCat">${catOptions}</select>
+                </div>
+              </div>
+
+              <div class="text-xs font-semibold" style="color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--space-2)">Items del comprobante</div>
+              <div id="receiptItemsList" style="min-height:60px;max-height:320px;overflow-y:auto"></div>
+
+              <button class="btn btn-ghost btn-sm" style="margin-top:var(--space-2)" onclick="FinancesModule.addReceiptRow()">+ Agregar item</button>
+
+              <div class="d-flex justify-between items-center" style="margin-top:var(--space-4);padding-top:var(--space-3);border-top:var(--border)">
+                <span class="text-sm font-semibold">Total</span>
+                <span class="font-semibold text-primary" id="receiptGrandTotal">$0</span>
+              </div>
             </div>
           </div>
         `,
-        primaryLabel: 'Registrar gasto',
+        primaryLabel: 'Registrar gastos',
         onClose: () => URL.revokeObjectURL(url),
         onOpen: () => {
+          addReceiptRow(); // fila vacía inicial
+
           const btn = document.getElementById('btnDetectar');
           if (!btn) return;
           btn.addEventListener('click', async () => {
-            btn.disabled = true;
+            btn.disabled    = true;
             btn.textContent = 'Analizando…';
-            const reader = new FileReader();
-            reader.onload = async evt => {
-              const b64 = evt.target.result.split(',')[1];
-              const result = await analyzeReceiptWithGemini(b64, file.type);
+            const reader    = new FileReader();
+            reader.onload   = async evt => {
+              const b64   = evt.target.result.split(',')[1];
+              const items = await analyzeReceiptWithGemini(b64, file.type);
               btn.disabled = false;
-              btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Auto-detectar monto con IA';
-              if (result) {
-                if (result.monto)      document.getElementById('fExpAmount').value = result.monto;
-                if (result.descripcion) document.getElementById('fExpDesc').value = result.descripcion;
-                App.toast('success', `Detectado: ${result.descripcion} — $${Number(result.monto).toLocaleString('es-AR')}`);
+              btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/><path d="M12 8v4l3 3"/></svg> Auto-detectar items con IA';
+              if (items?.length) {
+                document.getElementById('receiptItemsList').innerHTML = '';
+                _rrc = 0;
+                items.forEach(item => addReceiptRow(item));
+                App.toast('success', `${items.length} item${items.length !== 1 ? 's' : ''} detectado${items.length !== 1 ? 's' : ''} — revisá y corregí si hace falta`);
               }
             };
             reader.readAsDataURL(file);
           });
         },
-        onConfirm: () => saveExpense(null),
+        onConfirm: () => saveReceiptItems(),
       });
     };
     input.click();
@@ -581,5 +775,5 @@ const FinancesModule = (() => {
     render(document.getElementById('pageContent'));
   }
 
-  return { render, openCreateModal, openEditExpense, removeExpense, importFromExcel, openWithReceipt, clearAllExpenses };
+  return { render, openCreateModal, openEditExpense, removeExpense, importFromExcel, openWithReceipt, clearAllExpenses, toggleStockFields, onIngredientChange, addReceiptRow, recalcReceiptTotal, onReceiptIngChange };
 })();
