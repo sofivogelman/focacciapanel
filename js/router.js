@@ -6,11 +6,11 @@ const Router = (() => {
     dashboard: { title: 'Resumen',      module: () => DashboardModule,  primaryLabel: 'Nuevo pedido',    primaryRoute: 'orders' },
     orders:    { title: 'Pedidos',      module: () => OrdersModule,     primaryLabel: 'Nuevo pedido',    primaryRoute: null },
     products:  { title: 'Catálogo',     module: () => ProductsModule,   primaryLabel: '',                primaryRoute: null },
-    inventory: { title: 'Ingredientes', module: () => InventoryModule,  primaryLabel: 'Agregar stock',   primaryRoute: null },
+    inventory: { title: 'Inventario',   module: () => InventoryModule,  primaryLabel: 'Agregar ingrediente', primaryRoute: null },
     clients:   { title: 'Clientes',     module: () => ClientsModule,    primaryLabel: 'Nuevo cliente',   primaryRoute: null },
     finances:  { title: 'Finanzas',     module: () => FinancesModule,   primaryLabel: 'Agregar gasto',   primaryRoute: null },
     repartos:  { title: 'Repartos',     module: () => DeliveriesModule, primaryLabel: 'Registrar salida', primaryRoute: null },
-    produccion: { title: 'Producción',   module: () => ProductionModule,  primaryLabel: '',              primaryRoute: null },
+    produccion: { title: 'Producción',   module: () => ProductionModule,  primaryLabel: 'Registrar masa', primaryRoute: null },
     analisis:   { title: 'Análisis',     module: () => AnalyticsModule,  primaryLabel: '',              primaryRoute: null },
     config:    { title: 'Configuración', module: () => ConfigModule,      primaryLabel: '',              primaryRoute: null },
   };

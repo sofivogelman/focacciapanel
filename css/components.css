@@ -754,6 +754,11 @@
   .stat-card {
     padding: var(--space-4);
   }
+
+  /* Modal comprobante: apilar imagen y form */
+  .receipt-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* === CHECKBOXES EN MODAL PROMOS === */

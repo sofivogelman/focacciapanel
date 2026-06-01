@@ -273,35 +273,95 @@ const FinancesModule = (() => {
   }
 
   // ─── Comprobante (imagen / PDF) ───────────────────────────────────────────────
+  const GEMINI_KEY_LS = 'focaccia_gemini_key';
+
+  function getGeminiKey() {
+    return localStorage.getItem(GEMINI_KEY_LS) || '';
+  }
+
+  async function analyzeReceiptWithGemini(base64Data, mimeType) {
+    const key = getGeminiKey();
+    if (!key) { App.toast('error', 'Configurá tu clave Gemini en Configuración → IA'); return null; }
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: 'Sos un asistente para una emprendedora. Analizá este ticket/factura y extraé: 1) el monto TOTAL final (solo el número entero en pesos argentinos, sin separadores ni símbolos), 2) una descripción breve del comercio o tipo de gasto. Respondé SOLO con JSON así: {"monto":1234,"descripcion":"nombre del comercio"} Sin markdown ni texto adicional.' },
+          { inline_data: { mime_type: mimeType, data: base64Data } }
+        ]}]
+      }),
+    });
+    if (!res.ok) { App.toast('error', 'Error al llamar a Gemini: ' + res.status); return null; }
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    try {
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      return JSON.parse(cleaned);
+    } catch { App.toast('error', 'No se pudo leer la respuesta de Gemini'); return null; }
+  }
+
   function openWithReceipt() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,application/pdf';
+    input.capture = 'environment';
     input.onchange = e => {
       const file = e.target.files[0];
       if (!file) return;
       const url = URL.createObjectURL(file);
       const isPDF = file.type === 'application/pdf';
+      const hasGemini = !!getGeminiKey();
+
       App.openModal({
         title: 'Cargar comprobante',
         size: 'modal-lg',
         body: `
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5);align-items:start">
-            <div style="background:var(--color-border-light);border-radius:var(--radius-sm);overflow:hidden;min-height:200px;display:flex;align-items:center;justify-content:center">
-              ${isPDF
-                ? `<iframe src="${url}" style="width:100%;height:400px;border:none"></iframe>`
-                : `<img src="${url}" style="width:100%;max-height:400px;object-fit:contain;display:block" />`
-              }
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5);align-items:start" class="receipt-grid">
+            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+              <div style="background:var(--color-border-light);border-radius:var(--radius-sm);overflow:hidden;min-height:160px;display:flex;align-items:center;justify-content:center">
+                ${isPDF
+                  ? `<iframe src="${url}" style="width:100%;height:340px;border:none"></iframe>`
+                  : `<img src="${url}" style="width:100%;max-height:340px;object-fit:contain;display:block" />`
+                }
+              </div>
+              ${!isPDF ? `
+                <button class="btn btn-secondary btn-sm" id="btnDetectar" ${!hasGemini ? 'disabled title="Configurá tu clave Gemini primero"' : ''}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  Auto-detectar monto con IA
+                </button>
+                ${!hasGemini ? '<div class="form-hint">Configurá tu clave Gemini en Configuración para usar esta función.</div>' : ''}
+              ` : ''}
             </div>
             <div>
-              <div class="form-hint" style="margin-bottom:var(--space-4)">Registrá solo los productos del negocio. Si aparece algo nuevo que necesitás comprar, agregalo primero en Ingredientes.</div>
+              <div class="form-hint" style="margin-bottom:var(--space-4)">Mirá el comprobante y completá los datos del gasto.</div>
               ${buildExpenseForm()}
             </div>
           </div>
         `,
         primaryLabel: 'Registrar gasto',
-        // El archivo nunca se guarda — se libera al cerrar el modal (confirm, cancelar, X o Escape)
         onClose: () => URL.revokeObjectURL(url),
+        onOpen: () => {
+          const btn = document.getElementById('btnDetectar');
+          if (!btn) return;
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            btn.textContent = 'Analizando…';
+            const reader = new FileReader();
+            reader.onload = async evt => {
+              const b64 = evt.target.result.split(',')[1];
+              const result = await analyzeReceiptWithGemini(b64, file.type);
+              btn.disabled = false;
+              btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Auto-detectar monto con IA';
+              if (result) {
+                if (result.monto)      document.getElementById('fExpAmount').value = result.monto;
+                if (result.descripcion) document.getElementById('fExpDesc').value = result.descripcion;
+                App.toast('success', `Detectado: ${result.descripcion} — $${Number(result.monto).toLocaleString('es-AR')}`);
+              }
+            };
+            reader.readAsDataURL(file);
+          });
+        },
         onConfirm: () => saveExpense(null),
       });
     };

@@ -19,6 +19,28 @@ const ConfigModule = (() => {
       <div id="cfgRecipes" style="margin-top:var(--space-6)"></div>
       <div id="cfgPromoStats" style="margin-top:var(--space-6)"></div>
 
+      <!-- IA para comprobantes -->
+      <div class="card" style="margin-top:var(--space-6)">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Detección automática de comprobantes (IA)</div>
+            <div class="card-subtitle">Usá Gemini para extraer el monto y descripción al subir un ticket o factura</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+          <div class="form-row" style="max-width:480px">
+            <div class="form-group">
+              <label class="form-label">Clave API de Gemini</label>
+              <input type="password" class="form-input" id="cfgGeminiKey" value="${localStorage.getItem('focaccia_gemini_key') || ''}" placeholder="AIza…" autocomplete="off" />
+              <div class="form-hint">Obtenela gratis en <strong>aistudio.google.com</strong> → Get API Key. Se guarda solo en este dispositivo.</div>
+            </div>
+          </div>
+          <div>
+            <button class="btn btn-primary btn-sm" onclick="ConfigModule.saveGeminiKey()">Guardar clave</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Sincronización Google Drive -->
       <div class="card" style="margin-top:var(--space-6)">
         <div class="card-header">
@@ -65,7 +87,7 @@ const ConfigModule = (() => {
         </div>
         ${items.length === 0
           ? `<p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">Sin sabores cargados todavía.</p>`
-          : `<table class="table">
+          : `<div style="overflow-x:auto"><table class="table">
               <thead><tr><th>Nombre</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 ${items.map(f => `
@@ -80,7 +102,7 @@ const ConfigModule = (() => {
                   </tr>
                 `).join('')}
               </tbody>
-            </table>`
+            </table></div>`
         }
       </div>
     `;
@@ -158,7 +180,7 @@ const ConfigModule = (() => {
         </div>
         ${items.length === 0
           ? `<p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">Sin formatos cargados todavía.</p>`
-          : `<table class="table">
+          : `<div style="overflow-x:auto"><table class="table">
               <thead><tr><th>Nombre</th><th>Precio</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 ${items.map(f => `
@@ -174,7 +196,7 @@ const ConfigModule = (() => {
                   </tr>
                 `).join('')}
               </tbody>
-            </table>`
+            </table></div>`
         }
       </div>
     `;
@@ -263,13 +285,13 @@ const ConfigModule = (() => {
           ? `<p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">
                Sin promos configuradas. Agregá una para clasificar combos que aparecen en tus pedidos.
              </p>`
-          : `<table class="table">
+          : `<div style="overflow-x:auto"><table class="table">
               <thead>
                 <tr>
-                  <th>Semana</th>
+                  <th class="th-hide-mobile">Semana</th>
                   <th>Nombre en pedido</th>
-                  <th>Tipo</th>
-                  <th>Contenido</th>
+                  <th class="th-hide-mobile">Tipo</th>
+                  <th class="th-hide-mobile">Contenido</th>
                   <th>Precio</th>
                   <th>Estado</th>
                   <th></th>
@@ -278,10 +300,10 @@ const ConfigModule = (() => {
               <tbody>
                 ${items.map(p => `
                   <tr>
-                    <td class="text-sm" style="color:var(--color-text-muted);white-space:nowrap">${p.semana ? fmtWeek(p.semana) : '—'}</td>
+                    <td class="text-sm td-hide-mobile" style="color:var(--color-text-muted);white-space:nowrap">${p.semana ? fmtWeek(p.semana) : '—'}</td>
                     <td class="font-medium">${escHtml(p.name)}</td>
-                    <td class="text-sm">${p.tipo ? `<span class="badge badge-primary">${escHtml(p.tipo)}</span>` : '<span style="color:var(--color-text-muted)">—</span>'}</td>
-                    <td class="text-sm" style="color:var(--color-text-secondary)">
+                    <td class="text-sm td-hide-mobile">${p.tipo ? `<span class="badge badge-primary">${escHtml(p.tipo)}</span>` : '<span style="color:var(--color-text-muted)">—</span>'}</td>
+                    <td class="text-sm td-hide-mobile" style="color:var(--color-text-secondary)">
                       ${(p.items || []).length > 0
                         ? p.items.map(i => `${i.qty}× ${escHtml(i.format)}`).join(', ')
                         : '<span style="color:var(--color-text-muted)">—</span>'
@@ -297,7 +319,7 @@ const ConfigModule = (() => {
                   </tr>
                 `).join('')}
               </tbody>
-            </table>`
+            </table></div>`
         }
       </div>
     `;
@@ -490,7 +512,7 @@ const ConfigModule = (() => {
               </div>
               ${rows.length === 0
                 ? `<p class="text-sm" style="color:var(--color-text-muted);padding-left:var(--space-4)">Sin ingredientes cargados.</p>`
-                : `<table class="table">
+                : `<div style="overflow-x:auto"><table class="table">
                     <tbody>
                       ${rows.map(r => {
                         const ing = ingredients.find(i => i.id === r.ingredientId);
@@ -505,7 +527,7 @@ const ConfigModule = (() => {
                         </tr>`;
                       }).join('')}
                     </tbody>
-                  </table>`
+                  </table></div>`
               }
             </div>`;
         }).join('')}
@@ -671,21 +693,21 @@ const ConfigModule = (() => {
             <div class="card-subtitle">Agrupado por tipo · ordenado por pedidos</div>
           </div>
         </div>
-        <table class="table">
+        <div style="overflow-x:auto"><table class="table">
           <thead>
-            <tr><th>Tipo</th><th>Contenido</th><th>Semanas</th><th>Pedidos</th><th>Revenue</th><th>Desglose por semana</th></tr>
+            <tr><th>Tipo</th><th class="th-hide-mobile">Contenido</th><th class="th-hide-mobile">Semanas</th><th>Pedidos</th><th>Revenue</th><th class="th-hide-mobile">Desglose por semana</th></tr>
           </thead>
           <tbody>
             ${stats.map(g => `
               <tr>
                 <td class="font-medium">${escHtml(g.tipo)}</td>
-                <td class="text-sm" style="color:var(--color-text-secondary)">
+                <td class="text-sm td-hide-mobile" style="color:var(--color-text-secondary)">
                   ${Object.entries(g.allFormats).map(([fmt, qty]) => `${qty}× ${escHtml(fmt)}`).join(', ') || '—'}
                 </td>
-                <td class="text-sm">${g.semanas.length}</td>
+                <td class="text-sm td-hide-mobile">${g.semanas.length}</td>
                 <td class="font-semibold">${g.totalOrders}</td>
                 <td class="text-sm">${g.totalRevenue ? '$' + g.totalRevenue.toLocaleString('es-AR') : '—'}</td>
-                <td class="text-xs" style="color:var(--color-text-muted)">
+                <td class="text-xs td-hide-mobile" style="color:var(--color-text-muted)">
                   ${g.semanas.filter(w => w.orderCount > 0).map(w =>
                     `${w.promo.semana ? fmtWeek(w.promo.semana) : '?'}: ${w.orderCount} ped.`
                   ).join(' · ') || '—'}
@@ -693,7 +715,7 @@ const ConfigModule = (() => {
               </tr>
             `).join('')}
           </tbody>
-        </table>
+        </table></div>
       </div>
     `;
   }
@@ -710,6 +732,12 @@ const ConfigModule = (() => {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  function saveGeminiKey() {
+    const key = document.getElementById('cfgGeminiKey')?.value.trim() || '';
+    localStorage.setItem('focaccia_gemini_key', key);
+    App.toast('success', key ? 'Clave Gemini guardada' : 'Clave Gemini eliminada');
+  }
+
   return {
     render,
     openAddFlavor, editFlavor, toggleFlavor, deleteFlavor,
@@ -717,5 +745,6 @@ const ConfigModule = (() => {
     openAddPromo,  editPromo,  togglePromo,  deletePromo, addPromoItemRow,
     openAddRecipe, editRecipe, deleteRecipe,
     resolveFlavor, resolvePromo,
+    saveGeminiKey,
   };
 })();

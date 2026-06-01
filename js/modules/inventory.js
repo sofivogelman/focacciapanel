@@ -157,7 +157,7 @@ const InventoryModule = (() => {
     container.innerHTML = `
       <div class="fade-in">
         <div class="page-header">
-          <h1 class="page-title">Ingredientes</h1>
+          <h1 class="page-title">Inventario</h1>
           <p class="page-subtitle">${ingredients.length} ingredientes · ${low > 0 ? `<span class="text-danger">${low} con stock bajo</span>` : 'todo el stock OK'}</p>
         </div>
 

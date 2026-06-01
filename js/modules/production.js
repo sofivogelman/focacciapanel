@@ -34,7 +34,7 @@ const ProductionModule = (() => {
       });
     });
 
-    let overflow = 0; // sobrante del día anterior que se traslada al siguiente
+    let overflow = 0;
 
     return Object.entries(byDate)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -51,7 +51,7 @@ const ProductionModule = (() => {
 
         const masaHecha    = masaLograda + overflow;
         const masaSobrante = Math.max(0, masaHecha - masaFinal);
-        overflow           = masaSobrante; // se traslada al próximo día
+        overflow           = masaSobrante;
 
         const masaPendiente    = Math.max(0, masaFinal - masaHecha);
         const bolsasPendientes = Math.ceil(masaPendiente / MASA_POR_BOLSA);
@@ -63,6 +63,20 @@ const ProductionModule = (() => {
           completa: masaHecha >= masaFinal && masaFinal > 0,
         };
       });
+  }
+
+  // ─── Distribución de bolsas a días ───────────────────────────────────────────
+  function calcDistribution(totalBolsas, plan) {
+    let remaining = totalBolsas * MASA_POR_BOLSA;
+    return plan.map(day => {
+      const needed = Math.max(0, day.masaFinal - day.masaHecha);
+      if (needed <= 0 || day.completa) return { ...day, bolsasAsig: 0, cubierto: true };
+      const bolsasAsig = Math.min(Math.ceil(needed / MASA_POR_BOLSA), Math.ceil(remaining / MASA_POR_BOLSA));
+      const gramsAsig  = bolsasAsig * MASA_POR_BOLSA;
+      remaining       -= gramsAsig;
+      if (remaining < 0) remaining = 0;
+      return { ...day, bolsasAsig, cubierto: gramsAsig >= needed };
+    });
   }
 
   // ─── Formateo de fecha ────────────────────────────────────────────────────────
@@ -77,15 +91,23 @@ const ProductionModule = (() => {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   function render(container) {
-    const plan = computePlan();
+    const plan     = computePlan();
+    const pending  = plan.filter(p => !p.completa);
+    const totalNec = pending.reduce((s, p) => s + p.bolsasPendientes, 0);
 
     container.innerHTML = `
       <div class="fade-in">
-        <div class="page-header">
+        <div class="page-header d-flex items-center justify-between">
           <div>
             <h1 class="page-title">Producción</h1>
-            <p class="page-subtitle">Masa necesaria para pedidos pendientes · redondeado a bolsas de 1kg</p>
+            <p class="page-subtitle">Masa necesaria para pedidos pendientes · bolsas de 1kg</p>
           </div>
+          ${pending.length > 0 ? `
+            <button class="btn btn-primary" onclick="ProductionModule.openMasaModal()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+              Registrar masa hecha
+            </button>
+          ` : ''}
         </div>
 
         ${plan.length === 0 ? `
@@ -120,7 +142,7 @@ const ProductionModule = (() => {
       ? 'var(--color-success-subtle, #f0faf0)'
       : 'var(--color-primary-subtle)';
 
-    const overflowUsed = p.masaHecha - p.masaLograda; // masa que vino del día anterior
+    const overflowUsed = p.masaHecha - p.masaLograda;
 
     return `
       <div class="card" style="margin-bottom:var(--space-4)${p.completa ? ';opacity:0.65' : ''}">
@@ -136,7 +158,7 @@ const ProductionModule = (() => {
             ${p.completa
               ? `<span class="badge badge-success">Masa lista ✓</span>
                  <button class="btn btn-xs btn-ghost" onclick="ProductionModule.clearMasa('${p.date}')">Reiniciar</button>`
-              : `<button class="btn btn-sm btn-primary" onclick="ProductionModule.logMasa('${p.date}', ${p.bolsasPendientes || p.bolsas})">Registrar masa hecha</button>`
+              : `<span class="badge badge-warning">Faltan ${p.bolsasPendientes} bolsa${p.bolsasPendientes !== 1 ? 's' : ''}</span>`
             }
           </div>
         </div>
@@ -150,12 +172,11 @@ const ProductionModule = (() => {
           </div>
           <div>
             <div class="text-xs font-semibold" style="color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--space-2)">Masa</div>
-            <div class="text-sm">Necesaria exacta: <strong>${p.masaNeta}g</strong></div>
-            <div class="text-sm">Con margen (↑ bolsa): <strong>${p.masaFinal}g</strong> (${p.bolsas} bolsa${p.bolsas !== 1 ? 's' : ''} · ${p.harinaFinal}g harina)</div>
+            <div class="text-sm">Necesaria: <strong>${p.bolsas} bolsa${p.bolsas !== 1 ? 's' : ''}</strong> (${p.masaFinal}g · ${p.harinaFinal}g harina)</div>
             ${p.masaHecha > 0 ? `
               <div class="text-sm" style="color:var(--color-success);margin-top:var(--space-1)">
                 ✓ Disponible: ${p.masaHecha}g
-                ${overflowUsed > 0 ? `<span style="color:var(--color-text-muted);font-weight:400"> (${p.masaLograda}g propia + ${overflowUsed}g sobrante del día anterior)</span>` : ''}
+                ${overflowUsed > 0 ? `<span style="color:var(--color-text-muted);font-weight:400"> (incluye ${overflowUsed}g de día anterior)</span>` : ''}
               </div>
             ` : ''}
             ${!p.completa && p.masaHecha > 0 ? `
@@ -171,42 +192,114 @@ const ProductionModule = (() => {
           ${p.completa
             ? `✓ Masa completa — todo listo para ${fmtDate(p.date)}`
             : p.masaHecha > 0
-              ? `Todavía falta hacer: ${p.bolsasPendientes} bolsa${p.bolsasPendientes !== 1 ? 's' : ''} de 1kg (${p.bolsasPendientes * HARINA_POR_BOLSA}g harina → ${p.masaPendiente}g masa)`
-              : `Preparar: ${p.bolsas} bolsa${p.bolsas !== 1 ? 's' : ''} de 1kg (${p.harinaFinal}g harina → ${p.masaFinal}g masa)`
+              ? `Todavía falta: ${p.bolsasPendientes} bolsa${p.bolsasPendientes !== 1 ? 's' : ''} de 1kg`
+              : `Necesitás: ${p.bolsas} bolsa${p.bolsas !== 1 ? 's' : ''} de 1kg (${p.harinaFinal}g harina → ${p.masaFinal}g masa)`
           }
         </div>
       </div>
     `;
   }
 
-  // ─── Registrar masa hecha ─────────────────────────────────────────────────────
-  function logMasa(deliveryDate, bolsasSugeridas) {
+  // ─── Modal global: cuántas bolsas hice hoy ───────────────────────────────────
+  function openMasaModal() {
+    const plan    = computePlan();
+    const pending = plan.filter(p => !p.completa);
+    if (!pending.length) { App.toast('error', 'No hay pedidos pendientes de masa'); return; }
+    const totalNec = pending.reduce((s, p) => s + p.bolsasPendientes, 0);
+
     App.openModal({
       title: 'Registrar masa hecha',
-      size: 'modal-sm',
       body: `
-        <p class="text-sm" style="color:var(--color-text-secondary);margin-bottom:var(--space-4)">
-          Fecha de entrega: <strong style="text-transform:capitalize">${fmtDate(deliveryDate)}</strong>
-        </p>
         <div class="form-group">
-          <label class="form-label">Bolsas de 1kg harina usadas</label>
-          <input class="form-input" id="fMasaBolsas" type="number" min="1" step="1"
-            value="${bolsasSugeridas}"
-            oninput="document.getElementById('fMasaCalc').textContent = (parseInt(this.value)||0) * ${MASA_POR_BOLSA} + 'g de masa · ' + (parseInt(this.value)||0) * ${HARINA_POR_BOLSA} + 'g harina'" />
-          <div class="form-hint" id="fMasaCalc">${bolsasSugeridas * MASA_POR_BOLSA}g de masa · ${bolsasSugeridas * HARINA_POR_BOLSA}g harina</div>
+          <label class="form-label">¿Cuántas bolsas de 1kg harina hiciste?</label>
+          <input class="form-input" id="fMasaBolsas" type="number" min="1" step="1" value="${totalNec}"
+            style="font-size:var(--text-xl);text-align:center;height:48px"
+            oninput="ProductionModule.previewDist(parseInt(this.value)||0)" />
+          <div class="form-hint">${totalNec} bolsa${totalNec !== 1 ? 's' : ''} necesarias para cubrir todos los pedidos pendientes</div>
         </div>
+        <div id="masaDistPreview" style="margin-top:var(--space-4)"></div>
       `,
-      primaryLabel: 'Registrar',
+      primaryLabel: 'Registrar y distribuir',
+      onOpen: () => previewDist(totalNec),
       onConfirm: () => {
         const bolsas = parseInt(document.getElementById('fMasaBolsas').value) || 0;
         if (bolsas <= 0) { App.toast('error', 'Ingresá la cantidad de bolsas'); return false; }
-        const grams = bolsas * MASA_POR_BOLSA;
-        Store.masaLog.create({ deliveryDate, grams, bolsas });
-        App.toast('success', `${bolsas} bolsa${bolsas !== 1 ? 's' : ''} registrada${bolsas !== 1 ? 's' : ''} — ${grams}g de masa`);
-        render(document.getElementById('pageContent'));
+        commitDistribution(bolsas);
         return true;
       },
     });
+  }
+
+  function previewDist(totalBolsas) {
+    const el = document.getElementById('masaDistPreview');
+    if (!el) return;
+    if (!totalBolsas) { el.innerHTML = ''; return; }
+
+    const plan    = computePlan();
+    const pending = plan.filter(p => !p.completa);
+    const dist    = calcDistribution(totalBolsas, pending);
+    const cubiertos = dist.filter(d => d.bolsasAsig > 0);
+
+    if (!cubiertos.length) { el.innerHTML = '<div class="text-sm text-muted">No hay pedidos pendientes para cubrir.</div>'; return; }
+
+    const rows = dist.map(d => {
+      const icon  = d.completa || (d.bolsasAsig > 0 && d.cubierto) ? '✓' : d.bolsasAsig > 0 ? '~' : '✗';
+      const color = d.completa || d.cubierto ? 'var(--color-success)' : d.bolsasAsig > 0 ? 'var(--color-warning)' : 'var(--color-danger)';
+      const label = d.completa
+        ? 'Ya completo'
+        : d.cubierto
+          ? `${d.bolsasAsig} bolsa${d.bolsasAsig !== 1 ? 's' : ''} → cubierto`
+          : d.bolsasAsig > 0
+            ? `${d.bolsasAsig} bolsa${d.bolsasAsig !== 1 ? 's' : ''} parcial — falta masa`
+            : `Sin masa — faltan ${d.bolsasPendientes} bolsa${d.bolsasPendientes !== 1 ? 's' : ''}`;
+      return `
+        <div class="d-flex items-center gap-3" style="padding:var(--space-2) 0;border-bottom:var(--border-light)">
+          <span style="font-size:16px;color:${color};min-width:20px;text-align:center">${icon}</span>
+          <div class="flex-1">
+            <div class="text-sm font-medium" style="text-transform:capitalize">${fmtDate(d.date)}</div>
+            <div class="text-xs text-muted">${d.counts.pedidos} pedido${d.counts.pedidos !== 1 ? 's' : ''} · ${d.bolsas} bolsa${d.bolsas !== 1 ? 's' : ''} necesarias</div>
+          </div>
+          <div class="text-sm" style="color:${color};font-weight:500;text-align:right">${label}</div>
+        </div>
+      `;
+    }).join('');
+
+    const sobranteTotal = totalBolsas * MASA_POR_BOLSA - dist.reduce((s, d) => s + d.bolsasAsig * MASA_POR_BOLSA, 0);
+
+    el.innerHTML = `
+      <div style="background:var(--color-bg);border-radius:var(--radius-sm);border:var(--border-light);padding:var(--space-3) var(--space-4)">
+        <div class="text-xs font-semibold" style="color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--space-2)">Distribución</div>
+        ${rows}
+        ${sobranteTotal > 0 ? `
+          <div class="text-xs text-muted" style="margin-top:var(--space-3)">Sobrante después de distribuir: ${Math.round(sobranteTotal)}g</div>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  function commitDistribution(totalBolsas) {
+    const plan    = computePlan();
+    const pending = plan.filter(p => !p.completa);
+    const dist    = calcDistribution(totalBolsas, pending);
+
+    dist.forEach(d => {
+      if (d.bolsasAsig > 0) {
+        Store.masaLog.create({ deliveryDate: d.date, grams: d.bolsasAsig * MASA_POR_BOLSA, bolsas: d.bolsasAsig });
+      }
+    });
+
+    // Descontar harina del inventario
+    const harinaIng = Store.ingredients.where(i => i.name.toLowerCase().includes('harina'));
+    if (harinaIng.length > 0) {
+      const ing       = harinaIng[0];
+      const deduccion = ing.unit.toLowerCase().startsWith('g') ? totalBolsas * 1000 : totalBolsas;
+      const newStock  = Math.max(0, Math.round((ing.stock - deduccion) * 100) / 100);
+      Store.ingredients.update(ing.id, { stock: newStock });
+    }
+
+    const cubiertos = dist.filter(d => d.cubierto && d.bolsasAsig > 0).length;
+    App.toast('success', `${totalBolsas} bolsa${totalBolsas !== 1 ? 's' : ''} distribuida${totalBolsas !== 1 ? 's' : ''} · ${cubiertos} día${cubiertos !== 1 ? 's' : ''} cubierto${cubiertos !== 1 ? 's' : ''}`);
+    render(document.getElementById('pageContent'));
   }
 
   // ─── Reiniciar masa de una fecha ──────────────────────────────────────────────
@@ -217,5 +310,5 @@ const ProductionModule = (() => {
     render(document.getElementById('pageContent'));
   }
 
-  return { render, logMasa, clearMasa };
+  return { render, openMasaModal, previewDist, clearMasa, openCreateModal: openMasaModal };
 })();

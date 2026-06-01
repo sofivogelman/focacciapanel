@@ -33,7 +33,11 @@ const OrdersModule = (() => {
 
   function filteredOrders() {
     let orders = Store.orders.all().sort((a, b) => b.id - a.id);
-    if (activeFilter !== 'all') orders = orders.filter(o => o.status === activeFilter);
+    if (activeFilter === 'por_cobrar') {
+      orders = orders.filter(o => !o.paid && o.status !== 'cancelado');
+    } else if (activeFilter !== 'all') {
+      orders = orders.filter(o => o.status === activeFilter);
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       orders = orders.filter(o => o.clientName.toLowerCase().includes(q) || String(o.id).includes(q));
@@ -464,7 +468,7 @@ const OrdersModule = (() => {
         <!-- Filters -->
         <div id="ordersFilterBar" class="d-flex gap-3 items-center" style="margin-bottom: var(--space-6); flex-wrap: wrap">
           <div class="tabs" style="margin-bottom: 0; border-bottom: none; gap: var(--space-1)">
-            ${[['all','Todos'], ['pendiente','Pendientes'], ['en_preparacion','En preparación'], ['listo','Listos'], ['entregado','Entregados']].map(([val, lbl]) => `
+            ${[['all','Todos'], ['pendiente','Pendientes'], ['por_cobrar','Por cobrar'], ['en_preparacion','En preparación'], ['listo','Listos'], ['entregado','Entregados']].map(([val, lbl]) => `
               <div class="tab-item ${activeFilter === val ? 'active' : ''}" onclick="OrdersModule.setFilter('${val}')">${lbl}</div>
             `).join('')}
           </div>
