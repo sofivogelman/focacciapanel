@@ -468,9 +468,14 @@ const OrdersModule = (() => {
     const totalNeeded = {};
     (order.items || []).forEach(item => {
       const flavorName = (item.flavor || '').trim().toLowerCase();
+      const formatName = (item.format || '').trim().toLowerCase();
       const qty        = item.qty || 1;
       flavorRecipes
-        .filter(r => (r.flavorName || '').toLowerCase() === flavorName)
+        .filter(r => {
+          const rFlv = (r.flavorName || '').toLowerCase();
+          const rFmt = (r.formatName || '').toLowerCase();
+          return rFlv === flavorName && (!rFmt || rFmt === formatName);
+        })
         .forEach(r => { totalNeeded[r.ingredientId] = (totalNeeded[r.ingredientId] || 0) + r.qty * qty; });
     });
 

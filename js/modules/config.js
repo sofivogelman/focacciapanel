@@ -627,75 +627,70 @@ const ConfigModule = (() => {
     return { promo: match, flavors: match.flavors || [] };
   }
 
-  // ─── Toppings por sabor ──────────────────────────────────────────────────────
+  // ─── Toppings por sabor × formato ────────────────────────────────────────────
   function renderFlavorRecipes() {
-    const el = document.getElementById('cfgFlavorRecipes');
+    const el      = document.getElementById('cfgFlavorRecipes');
     if (!el) return;
-    const flavors     = Store.flavors.where(f => f.active);
-    const ingredients = Store.ingredients.where(i => ['topping','hierba','condimento'].includes(i.category));
-    const recipes     = Store.flavorRecipes.all();
+    const flavors  = Store.flavors.where(f => f.active);
+    const formats  = Store.formats.where(f => f.active);
+    const ings     = Store.ingredients.all();
+    const recipes  = Store.flavorRecipes.all();
 
-    if (flavors.length === 0 || ingredients.length === 0) {
-      el.innerHTML = `
-        <div class="card">
-          <div class="card-header"><div class="card-title">Toppings por sabor</div></div>
-          <p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">
-            Cargá sabores e ingredientes (categoría Topping, Hierba o Condimento) primero.
-          </p>
-        </div>`;
+    if (flavors.length === 0) {
+      el.innerHTML = `<div class="card"><div class="card-header"><div class="card-title">Toppings por sabor</div></div>
+        <p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">Cargá sabores primero.</p></div>`;
       return;
     }
-
-    const byFlavor = {};
-    flavors.forEach(f => { byFlavor[f.name] = []; });
-    recipes.forEach(r => { if (byFlavor[r.flavorName] !== undefined) byFlavor[r.flavorName].push(r); });
 
     el.innerHTML = `
       <div class="card">
         <div class="card-header">
           <div>
             <div class="card-title">Toppings por sabor</div>
-            <div class="card-subtitle">Cantidad de cada topping por unidad · se descuenta al poner el pedido "En preparación"</div>
+            <div class="card-subtitle">Cantidad por unidad según formato · se descuenta al pasar el pedido a "En preparación"</div>
           </div>
+          <button class="btn btn-sm btn-ghost" onclick="ConfigModule.loadStandardToppings()">↺ Cargar estándar</button>
         </div>
-        ${flavors.map(flv => {
-          const rows = byFlavor[flv.name] || [];
-          return `
-            <div style="margin-bottom:var(--space-5)">
-              <div class="d-flex items-center gap-3" style="margin-bottom:var(--space-2)">
-                <span class="font-semibold text-sm">${escHtml(flv.name)}</span>
-                <button class="btn btn-xs btn-ghost" onclick="ConfigModule.openAddFlavorRecipe('${escHtml(flv.name)}')">+ Topping</button>
-              </div>
-              ${rows.length === 0
-                ? `<p class="text-sm" style="color:var(--color-text-muted);padding-left:var(--space-4)">Sin toppings definidos.</p>`
-                : `<div style="overflow-x:auto"><table class="table">
-                    <tbody>
-                      ${rows.map(r => {
-                        const ing = ingredients.find(i => i.id === r.ingredientId);
-                        if (!ing) return '';
-                        return `<tr>
-                          <td class="text-sm font-medium">${escHtml(ing.name)}</td>
-                          <td class="text-sm">${r.qty} ${ing.unit} / unidad</td>
-                          <td class="cfg-actions">
-                            <button class="btn btn-xs btn-ghost" onclick="ConfigModule.editFlavorRecipe(${r.id})">Editar</button>
-                            <button class="btn btn-xs btn-ghost cfg-delete" onclick="ConfigModule.deleteFlavorRecipe(${r.id})">✕</button>
-                          </td>
-                        </tr>`;
-                      }).join('')}
-                    </tbody>
-                  </table></div>`
-              }
-            </div>`;
-        }).join('')}
+
+        ${flavors.map(flv => `
+          <div style="margin-bottom:var(--space-6)">
+            <div class="font-semibold text-sm" style="margin-bottom:var(--space-3);color:var(--color-text)">${escHtml(flv.name)}</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:var(--space-3)">
+              ${formats.map(fmt => {
+                const rows = recipes.filter(r => r.flavorName === flv.name && r.formatName === fmt.name);
+                return `
+                  <div style="background:var(--color-bg);border-radius:var(--radius-md);padding:var(--space-3)">
+                    <div class="d-flex items-center justify-between" style="margin-bottom:var(--space-2)">
+                      <span class="text-xs font-semibold" style="color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em">${escHtml(fmt.name)}</span>
+                      <button class="btn btn-xs btn-ghost" onclick="ConfigModule.openAddFlavorRecipe('${escHtml(flv.name)}','${escHtml(fmt.name)}')">+ Agregar</button>
+                    </div>
+                    ${rows.length === 0
+                      ? `<p class="text-xs" style="color:var(--color-text-muted)">Sin toppings</p>`
+                      : rows.map(r => {
+                          const ing = ings.find(i => i.id === r.ingredientId);
+                          if (!ing) return '';
+                          return `<div class="d-flex items-center gap-1" style="padding:2px 0">
+                            <span class="text-xs flex-1">${escHtml(ing.name)}</span>
+                            <span class="text-xs" style="color:var(--color-text-muted);white-space:nowrap">${r.qty}${ing.unit}</span>
+                            <button class="btn btn-xs btn-ghost" onclick="ConfigModule.editFlavorRecipe(${r.id})" style="padding:1px 4px;font-size:11px">✎</button>
+                            <button class="btn btn-xs btn-ghost cfg-delete" onclick="ConfigModule.deleteFlavorRecipe(${r.id})" style="padding:1px 4px;font-size:11px">✕</button>
+                          </div>`;
+                        }).join('')
+                    }
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>
+        `).join('')}
       </div>
     `;
   }
 
-  function openAddFlavorRecipe(flavorName) {
-    const ingredients = Store.ingredients.where(i => ['topping','hierba','condimento'].includes(i.category));
-    if (!ingredients.length) { App.toast('error', 'Cargá ingredientes de tipo Topping o Hierba primero'); return; }
+  function openAddFlavorRecipe(flavorName, formatName) {
+    const ingredients = Store.ingredients.all().sort((a, b) => a.name.localeCompare(b.name));
+    if (!ingredients.length) { App.toast('error', 'Cargá ingredientes primero'); return; }
     App.openModal({
-      title: `Agregar topping — ${flavorName}`,
+      title: `Topping — ${flavorName} (${formatName})`,
       body: `
         <div class="form-row">
           <div class="form-group">
@@ -715,7 +710,7 @@ const ConfigModule = (() => {
         const ingId = parseInt(document.getElementById('fFRIng').value);
         const qty   = parseFloat(document.getElementById('fFRQty').value);
         if (!ingId || isNaN(qty) || qty <= 0) { App.toast('error', 'Completá los campos'); return false; }
-        Store.flavorRecipes.create({ flavorName, ingredientId: ingId, qty });
+        Store.flavorRecipes.create({ flavorName, formatName, ingredientId: ingId, qty });
         renderFlavorRecipes();
         return true;
       },
@@ -727,7 +722,7 @@ const ConfigModule = (() => {
     if (!r) return;
     const ing = Store.ingredients.find(r.ingredientId);
     App.openModal({
-      title: `Editar — ${r.flavorName}`,
+      title: `Editar — ${r.flavorName} (${r.formatName || 'todos'})`,
       body: `
         <div class="form-group">
           <label class="form-label">${ing ? escHtml(ing.name) : 'Ingrediente'}</label>
@@ -751,6 +746,56 @@ const ConfigModule = (() => {
   function deleteFlavorRecipe(id) {
     if (!confirm('¿Eliminar este topping de la receta?')) return;
     Store.flavorRecipes.remove(id);
+    renderFlavorRecipes();
+  }
+
+  // Cantidades estándar provistas por la emprendedora
+  function loadStandardToppings() {
+    const STANDARD = [
+      // Familiar
+      { flvKey:'romero',    fmtKey:'familiar',   ingKey:'romero',    qty:5    },
+      { flvKey:'romero',    fmtKey:'familiar',   ingKey:'sal',       qty:4    },
+      { flvKey:'tomate',    fmtKey:'familiar',   ingKey:'tomate',    qty:120  },
+      { flvKey:'tomate',    fmtKey:'familiar',   ingKey:'pesto',     qty:15   },
+      { flvKey:'papa',      fmtKey:'familiar',   ingKey:'papa',      qty:150  },
+      { flvKey:'papa',      fmtKey:'familiar',   ingKey:'parmesano', qty:35   },
+      { flvKey:'aceituna',  fmtKey:'familiar',   ingKey:'aceituna',  qty:80   },
+      // Individual
+      { flvKey:'romero',    fmtKey:'individual', ingKey:'romero',    qty:2    },
+      { flvKey:'romero',    fmtKey:'individual', ingKey:'sal',       qty:1.5  },
+      { flvKey:'tomate',    fmtKey:'individual', ingKey:'tomate',    qty:50   },
+      { flvKey:'tomate',    fmtKey:'individual', ingKey:'pesto',     qty:4    },
+      { flvKey:'papa',      fmtKey:'individual', ingKey:'papa',      qty:50   },
+      { flvKey:'papa',      fmtKey:'individual', ingKey:'parmesano', qty:12   },
+      { flvKey:'aceituna',  fmtKey:'individual', ingKey:'aceituna',  qty:27   },
+    ];
+
+    const flavors = Store.flavors.where(f => f.active);
+    const formats = Store.formats.where(f => f.active);
+    const ings    = Store.ingredients.all();
+
+    const findFlv = key => flavors.find(f => f.name.toLowerCase().includes(key));
+    const findFmt = key => formats.find(f => f.name.toLowerCase().includes(key));
+    const findIng = key => ings.find(i => i.name.toLowerCase().includes(key));
+
+    let count = 0, skip = 0;
+    STANDARD.forEach(s => {
+      const flv = findFlv(s.flvKey);
+      const fmt = findFmt(s.fmtKey);
+      const ing = findIng(s.ingKey);
+      if (!flv || !fmt || !ing) { skip++; return; }
+
+      // Reemplazar si ya existe para esta combinación
+      Store.flavorRecipes
+        .where(r => r.flavorName === flv.name && r.formatName === fmt.name && r.ingredientId === ing.id)
+        .forEach(r => Store.flavorRecipes.remove(r.id));
+
+      Store.flavorRecipes.create({ flavorName: flv.name, formatName: fmt.name, ingredientId: ing.id, qty: s.qty });
+      count++;
+    });
+
+    const msg = skip > 0 ? ` (${skip} no encontrados — verificá que los nombres de sabores, formatos e ingredientes coincidan)` : '';
+    App.toast(count > 0 ? 'success' : 'error', `${count} toppings cargados${msg}`);
     renderFlavorRecipes();
   }
 
@@ -873,7 +918,7 @@ const ConfigModule = (() => {
     openAddFormat, editFormat, toggleFormat, deleteFormat,
     openAddPromo,  editPromo,  togglePromo,  deletePromo, addPromoItemRow,
     openAddRecipe, editRecipe, deleteRecipe,
-    openAddFlavorRecipe, editFlavorRecipe, deleteFlavorRecipe,
+    openAddFlavorRecipe, editFlavorRecipe, deleteFlavorRecipe, loadStandardToppings,
     resolveFlavor, resolvePromo,
     saveGeminiKey,
   };
