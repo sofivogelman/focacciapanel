@@ -852,77 +852,40 @@ const ConfigModule = (() => {
 
     Store.promos.all().forEach(promo => {
       const key = (promo.tipo || promo.name).toLowerCase();
-      if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, semanas: [] };
-
-      // Filtrar pedidos por semana de ENTREGA (deliveryDate) si está definida
-      let pool = orders;
-      if (promo.semana) {
-        const start = new Date(promo.semana + 'T00:00:00').getTime();
-        const end   = start + 7 * 86400000;
-        pool = orders.filter(o => {
-          const dateStr = (o.deliveryDate || o.date || '').slice(0, 10);
-          const t = new Date(dateStr + 'T00:00:00').getTime();
-          return t >= start && t < end;
-        });
-      }
+      if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, orderCount: 0, itemCount: 0, revenue: 0, formatCounts: {} };
 
       const promoLow = promo.name.toLowerCase().trim();
-      let orderCount = 0, itemCount = 0, revenue = 0;
-      const formatCounts = {};
+      const entry = tipoMap[key];
 
-      pool.forEach(order => {
+      orders.forEach(order => {
         const matching = (order.items || []).filter(item => {
           const flavorLow = (item.flavor || '').toLowerCase().trim();
           const nameLow   = (item.name   || '').toLowerCase().trim();
-          // Exact match primero (items cargados como promo del catálogo)
           if (flavorLow === promoLow || nameLow === promoLow) return true;
-          // Fallback includes para compatibilidad con datos anteriores
           return (flavorLow + ' ' + nameLow).includes(promoLow) && promoLow.length > 4;
         });
         if (!matching.length) return;
 
-        orderCount++;
+        entry.orderCount++;
         matching.forEach(item => {
           const qty = item.qty || 1;
-          itemCount += qty;
-          // Usar precio del item; si es 0, usar precio definido en la promo
-          revenue += qty * (item.price || promo.price || 0);
-          // Contar por formato real del item
+          entry.itemCount += qty;
+          entry.revenue += qty * (item.price || promo.price || 0);
           const fmt = (item.format || '').trim();
           if (fmt && fmt.toLowerCase() !== 'promo') {
-            formatCounts[fmt] = (formatCounts[fmt] || 0) + qty;
+            entry.formatCounts[fmt] = (entry.formatCounts[fmt] || 0) + qty;
           }
         });
       });
-
-      // Si no hay formato en los items pero la promo tiene definición, estimarlo
-      if (!Object.keys(formatCounts).length && orderCount > 0) {
-        (promo.items || []).forEach(pi => {
-          if (pi.format) formatCounts[pi.format] = (formatCounts[pi.format] || 0) + pi.qty * orderCount;
-        });
-      }
-
-      tipoMap[key].semanas.push({ promo, orderCount, itemCount, revenue, formatCounts });
     });
 
-    return Object.values(tipoMap).map(group => {
-      const totalOrders  = group.semanas.reduce((s, w) => s + w.orderCount, 0);
-      const totalItems   = group.semanas.reduce((s, w) => s + w.itemCount, 0);
-      const totalRevenue = group.semanas.reduce((s, w) => s + w.revenue, 0);
-      const allFormats   = {};
-      group.semanas.forEach(w => {
-        Object.entries(w.formatCounts).forEach(([fmt, qty]) => {
-          allFormats[fmt] = (allFormats[fmt] || 0) + qty;
-        });
-      });
-      return { tipo: group.tipo, semanas: group.semanas, totalOrders, totalItems, totalRevenue, allFormats };
-    }).sort((a, b) => b.totalOrders - a.totalOrders);
+    return Object.values(tipoMap).sort((a, b) => b.orderCount - a.orderCount);
   }
 
   function renderPromoStats() {
     const el = document.getElementById('cfgPromoStats');
     if (!el) return;
-    const stats = computePromoStats().filter(s => s.semanas.length > 0);
+    const stats = computePromoStats();
     if (stats.length === 0) { el.innerHTML = ''; return; }
 
     el.innerHTML = `
@@ -930,28 +893,22 @@ const ConfigModule = (() => {
         <div class="card-header">
           <div>
             <div class="card-title">Comparativa de Promos</div>
-            <div class="card-subtitle">Agrupado por tipo · ordenado por pedidos</div>
+            <div class="card-subtitle">Total acumulado · ordenado por pedidos</div>
           </div>
         </div>
         <div style="overflow-x:auto"><table class="table">
           <thead>
-            <tr><th>Tipo</th><th class="th-hide-mobile">Contenido</th><th class="th-hide-mobile">Semanas</th><th>Pedidos</th><th class="th-hide-mobile">Unidades</th><th>Revenue</th><th class="th-hide-mobile">Desglose por semana</th></tr>
+            <tr><th>Tipo</th><th>Pedidos</th><th class="th-hide-mobile">Unidades</th><th>Revenue</th><th class="th-hide-mobile">Formatos</th></tr>
           </thead>
           <tbody>
             ${stats.map(g => `
               <tr>
                 <td class="font-medium">${escHtml(g.tipo)}</td>
-                <td class="text-sm td-hide-mobile" style="color:var(--color-text-secondary)">
-                  ${Object.entries(g.allFormats).map(([fmt, qty]) => `${qty}× ${escHtml(fmt)}`).join(', ') || '—'}
-                </td>
-                <td class="text-sm td-hide-mobile">${g.semanas.length}</td>
-                <td class="font-semibold">${g.totalOrders}</td>
-                <td class="text-sm td-hide-mobile">${g.totalItems || '—'}</td>
-                <td class="text-sm">${g.totalRevenue ? '$' + g.totalRevenue.toLocaleString('es-AR') : '—'}</td>
-                <td class="text-xs td-hide-mobile" style="color:var(--color-text-muted)">
-                  ${g.semanas.filter(w => w.orderCount > 0).map(w =>
-                    `${w.promo.semana ? fmtWeek(w.promo.semana) : '?'}: ${w.orderCount} ped.`
-                  ).join(' · ') || '—'}
+                <td class="font-semibold">${g.orderCount}</td>
+                <td class="text-sm td-hide-mobile">${g.itemCount || '—'}</td>
+                <td class="text-sm">${g.revenue ? '$' + g.revenue.toLocaleString('es-AR') : '—'}</td>
+                <td class="text-xs td-hide-mobile" style="color:var(--color-text-secondary)">
+                  ${Object.entries(g.formatCounts).map(([fmt, qty]) => `${qty}× ${escHtml(fmt)}`).join(', ') || '—'}
                 </td>
               </tr>
             `).join('')}
