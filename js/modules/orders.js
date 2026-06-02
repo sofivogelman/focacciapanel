@@ -125,7 +125,10 @@ const OrdersModule = (() => {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Fecha de entrega *</label>
-          <input type="date" class="form-input" id="fOrderDelivery" value="${isEdit ? o.deliveryDate : ''}" required />
+          <div style="display:flex;gap:var(--space-2)">
+            <input type="date" class="form-input" id="fOrderDelivery" value="${isEdit ? o.deliveryDate : ''}" required style="flex:1" />
+            <input type="time" class="form-input" id="fOrderDeliveryTime" value="${isEdit ? (o.deliveryTime || '') : ''}" style="width:116px" title="Hora de entrega (opcional)" />
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Estado</label>
@@ -305,10 +308,11 @@ const OrdersModule = (() => {
     if (!clientId || !date || !delivery) { App.toast('error', 'Completá los campos obligatorios'); return false; }
     if (items.length === 0) { App.toast('error', 'Agregá al menos un producto'); return false; }
 
-    const zone  = document.getElementById('fOrderZone').value;
-    const lote  = document.getElementById('fOrderLote').value.trim();
+    const zone         = document.getElementById('fOrderZone').value;
+    const lote         = document.getElementById('fOrderLote').value.trim();
+    const deliveryTime = document.getElementById('fOrderDeliveryTime')?.value || '';
     const total = items.reduce((s, i) => s + i.qty * i.price, 0);
-    const data  = { clientId, clientName: client?.name || '', date, deliveryDate: delivery, status, items, total, paymentMethod: payment, paid, notes, zone, lote };
+    const data  = { clientId, clientName: client?.name || '', date, deliveryDate: delivery, deliveryTime, status, items, total, paymentMethod: payment, paid, notes, zone, lote };
 
     if (editId) {
       Store.orders.update(editId, data);
