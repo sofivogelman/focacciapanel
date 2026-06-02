@@ -226,36 +226,33 @@ const AnalyticsModule = (() => {
       if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, orderCount: 0, itemCount: 0, revenue: 0, formatCounts: {} };
     });
 
-    function norm(s) { return (s || '').toLowerCase().normalize('NFC').trim(); }
+    // Strip tildes (U+0300-U+036F combining diacritical marks)
+    function norm(s) {
+      return (s || '').toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .trim();
+    }
 
     function findPromo(item) {
       const fmtN    = norm(item.format);
       const flavorN = norm(item.flavor);
       const nameN   = norm(item.name);
 
-      // Regla 1: el formato del item coincide con el nombre de la promo
-      // (ej: format="Promo25" → promo cuyo nombre es "Promo25"; format="Degustación" → promo "Degustación")
-      let match = promos.find(p => {
-        const pn = norm(p.name);
-        return pn.length > 2 && (fmtN === pn || fmtN.includes(pn) || pn.includes(fmtN) && fmtN.length > 2);
-      });
-      if (match) return match;
-
-      // Regla 2: el flavor/name del item coincide con el nombre de la promo
-      // (cuando se selecciona desde el catálogo del panel: flavor = promo.name)
-      match = promos.find(p => {
-        const pn = norm(p.name);
-        return pn.length > 3 && (flavorN === pn || nameN === pn || flavorN.includes(pn) || nameN.includes(pn));
-      });
-      if (match) return match;
-
-      // Regla 3: formato Familiar + flavor contiene "individual" → promo Familiar + Individual
-      if (fmtN.includes('familiar') && flavorN.includes('individual')) {
-        match = promos.find(p => norm(p.name).includes('individual'));
-        if (match) return match;
+      // Regla 1: format contiene "promo" → Promo25
+      if (fmtN.includes('promo')) {
+        return promos.find(p => norm(p.name).includes('promo')) || null;
       }
 
-      // El resto no es de ninguna promo
+      // Regla 2: format, flavor o name contiene "degustac" → Degustación
+      if (fmtN.includes('degustac') || flavorN.includes('degustac') || nameN.includes('degustac')) {
+        return promos.find(p => norm(p.name).includes('degustac')) || null;
+      }
+
+      // Regla 3: format "familiar" + flavor contiene "individual" → Familiar + Individual
+      if (fmtN.includes('familiar') && flavorN.includes('individual')) {
+        return promos.find(p => norm(p.name).includes('individual')) || null;
+      }
+
       return null;
     }
 
@@ -285,6 +282,36 @@ const AnalyticsModule = (() => {
     return Object.values(tipoMap).sort((a, b) => b.orderCount - a.orderCount);
   }
 
+  function buildPromosDiag() {
+    const promos = Store.promos.all();
+    const orders = Store.orders.all();
+    function norm(s) {
+      return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    }
+    let lines = [];
+    lines.push('=== PROMOS EN CONFIGURACIÓN ===');
+    if (promos.length === 0) {
+      lines.push('  ⚠ NINGUNA — andá a Configuración y agregá las promos');
+    } else {
+      promos.forEach(p => lines.push(`  • name="${p.name}" | tipo="${p.tipo || ''}" | active=${p.active}`));
+    }
+    lines.push('');
+    lines.push('=== ITEMS DE PEDIDOS (primeros 40) ===');
+    let count = 0;
+    for (const o of orders) {
+      for (const item of (o.items || [])) {
+        if (count++ >= 40) break;
+        const fN = norm(item.format); const flN = norm(item.flavor); const nN = norm(item.name);
+        let rule = '—';
+        if (fN.includes('promo'))                                          rule = '✓ Regla1(promo)';
+        else if (fN.includes('degustac')||flN.includes('degustac')||nN.includes('degustac')) rule = '✓ Regla2(degustac)';
+        else if (fN.includes('familiar') && flN.includes('individual'))    rule = '✓ Regla3(fam+ind)';
+        lines.push(`  [${o.clientName||'?'}] format="${item.format||''}" | flavor="${item.flavor||''}" | name="${item.name||''}" → ${rule}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
   function renderPromoStats() {
     const stats = computePromoStats();
     if (stats.length === 0) return '';
@@ -295,6 +322,10 @@ const AnalyticsModule = (() => {
             <div class="card-title">Comparativa de Promos</div>
             <div class="card-subtitle">Total acumulado · ordenado por pedidos</div>
           </div>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="
+            const d = AnalyticsModule._diagPromos();
+            App.openModal({ title:'Diagnóstico de promos', size:'modal-lg', body:'<pre style=\\'font-size:11px;white-space:pre-wrap;word-break:break-all\\'>' + d + '</pre>', primaryLabel:'Cerrar', onConfirm:()=>true });
+          ">🔍 Diagnóstico</button>
         </div>
         <div style="overflow-x:auto"><table class="table">
           <thead>
@@ -456,5 +487,6 @@ const AnalyticsModule = (() => {
     `;
   }
 
-  return { render, addBarrio, removeBarrio };
+  return { render, addBarrio, removeBarrio, _diagPromos: buildPromosDiag };
 })();
+
