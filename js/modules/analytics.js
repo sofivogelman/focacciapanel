@@ -249,8 +249,8 @@ const AnalyticsModule = (() => {
       });
       if (match) return match;
 
-      // Regla 3: el flavor contiene "individual" → promo Familiar + Individual
-      if (flavorN.includes('individual')) {
+      // Regla 3: formato Familiar + flavor contiene "individual" → promo Familiar + Individual
+      if (fmtN.includes('familiar') && flavorN.includes('individual')) {
         match = promos.find(p => norm(p.name).includes('individual'));
         if (match) return match;
       }
