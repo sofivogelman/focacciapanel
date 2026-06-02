@@ -708,6 +708,20 @@
     max-width: 100%;
   }
 
+  /* Modal: padding más compacto */
+  .modal-header {
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
+
+  .modal-body {
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+
+  .modal-footer {
+    padding: var(--space-3) var(--space-4);
+  }
+
   /* Toast: ancho completo en la parte baja */
   .toast-container {
     bottom: var(--space-3);
@@ -745,6 +759,20 @@
     grid-template-columns: 1fr;
   }
 
+  /* Inputs: 16px previene auto-zoom de iOS */
+  .form-input,
+  .form-select,
+  .form-textarea {
+    font-size: 16px;
+  }
+
+  /* Input de hora: no fijo, flexible */
+  input[type="time"].form-input {
+    width: auto !important;
+    flex: 1 !important;
+    min-width: 80px;
+  }
+
   /* Tablas dentro de cards: scroll horizontal */
   .table-wrapper {
     -webkit-overflow-scrolling: touch;
@@ -755,9 +783,60 @@
     padding: var(--space-4);
   }
 
+  /* Stat value: un poco más chico */
+  .stat-value {
+    font-size: var(--text-2xl);
+  }
+
   /* Modal comprobante: apilar imagen y form */
   .receipt-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Evitar overflow de elementos flex anidados */
+  .modal-body > *,
+  .card > *,
+  .form-group {
+    min-width: 0;
+  }
+}
+
+/* Pantallas muy chicas (≤ 480px) */
+@media (max-width: 480px) {
+  .page-content {
+    padding: var(--space-2);
+  }
+
+  .card {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+  }
+
+  .stat-card {
+    padding: var(--space-3);
+  }
+
+  .stat-value {
+    font-size: var(--text-xl);
+  }
+
+  .modal-body {
+    padding: var(--space-3);
+  }
+
+  /* Ocultar texto del botón primario en topbar, dejar solo el ícono */
+  #topbarPrimaryLabel {
+    display: none;
+  }
+
+  .btn-icon-only {
+    padding: 0;
+    width: 36px;
+  }
+
+  /* Checkbox grid de una columna */
+  .checkbox-grid {
+    grid-template-columns: 1fr;
   }
 }
 
