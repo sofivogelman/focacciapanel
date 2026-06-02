@@ -18,7 +18,6 @@ const ConfigModule = (() => {
       <div id="cfgPromos" style="margin-top:var(--space-6)"></div>
       <div id="cfgRecipes" style="margin-top:var(--space-6)"></div>
       <div id="cfgFlavorRecipes" style="margin-top:var(--space-6)"></div>
-      <div id="cfgPromoStats" style="margin-top:var(--space-6)"></div>
 
       <!-- Página de pedidos -->
       <div class="card" style="margin-top:var(--space-6)">
@@ -102,7 +101,6 @@ const ConfigModule = (() => {
     renderPromos();
     renderRecipes();
     renderFlavorRecipes();
-    renderPromoStats();
   }
 
   // ─── Sabores ─────────────────────────────────────────────────────────────────
@@ -845,147 +843,7 @@ const ConfigModule = (() => {
     renderFlavorRecipes();
   }
 
-  // ─── Métricas históricas de promos ───────────────────────────────────────────
-  function computePromoStats() {
-    const orders = Store.orders.all();
-    const promos = Store.promos.all();
-    const tipoMap = {};
-
-    // Inicializar una entrada por cada promo existente
-    promos.forEach(promo => {
-      const key = (promo.tipo || promo.name).toLowerCase();
-      if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, orderCount: 0, itemCount: 0, revenue: 0, formatCounts: {} };
-    });
-
-    function norm(s) { return (s || '').toLowerCase().normalize('NFC').trim(); }
-
-    function findPromo(item) {
-      const flavorN = norm(item.flavor);
-      const nameN   = norm(item.name);
-      const isPromoFmt = norm(item.format) === 'promo';
-
-      // 1) Exact match por nombre/flavor
-      let match = promos.find(p => {
-        const pn = norm(p.name);
-        return pn && (flavorN === pn || nameN === pn);
-      });
-      if (match) return match;
-
-      // 2) Includes match (nombre largo dentro del texto del item)
-      match = promos.find(p => {
-        const pn = norm(p.name);
-        return pn.length > 4 && (flavorN.includes(pn) || nameN.includes(pn));
-      });
-      if (match) return match;
-
-      // 3) Si el formato es 'Promo', buscar por precio exacto
-      if (isPromoFmt) {
-        match = promos.find(p => p.price > 0 && item.price === p.price);
-        if (match) return match;
-      }
-
-      // 4) Flavor con nota entre paréntesis: "Romero y Sal (con Individual de regalo)"
-      //    → el formato del ítem Y palabras del paréntesis aparecen en el nombre de la promo
-      const parenMatch = flavorN.match(/\(([^)]+)\)/);
-      if (parenMatch) {
-        const parenWords = parenMatch[1].split(/\s+/).filter(w => w.length > 3);
-        const fmtN = norm(item.format);
-        match = promos.find(p => {
-          const pn = norm(p.name);
-          const fmtInPromo = fmtN && pn.includes(fmtN.slice(0, 6));
-          const kwInPromo  = parenWords.some(w => pn.includes(w));
-          return fmtInPromo && kwInPromo;
-        });
-        if (match) return match;
-      }
-
-      return null;
-    }
-
-    // Recorrer pedido por pedido (cliente por cliente a través de sus pedidos)
-    const clients = Store.clients.all();
-    const processedOrders = new Set();
-
-    // Primero los pedidos asociados a un cliente
-    clients.forEach(client => {
-      orders.filter(o => o.clientId === client.id).forEach(order => {
-        processedOrders.add(order.id);
-        processOrder(order);
-      });
-    });
-    // Luego los que no tienen cliente asignado
-    orders.filter(o => !processedOrders.has(o.id)).forEach(order => processOrder(order));
-
-    function processOrder(order) {
-      const matchedKeys = new Set();
-      (order.items || []).forEach(item => {
-        const promo = findPromo(item);
-        if (!promo) return;
-        const key = (promo.tipo || promo.name).toLowerCase();
-        const entry = tipoMap[key];
-        if (!entry) return;
-
-        const qty = item.qty || 1;
-        entry.itemCount += qty;
-        entry.revenue   += qty * (item.price || promo.price || 0);
-        const fmt = (item.format || '').trim();
-        if (fmt && norm(fmt) !== 'promo') {
-          entry.formatCounts[fmt] = (entry.formatCounts[fmt] || 0) + qty;
-        }
-        if (!matchedKeys.has(key)) {
-          matchedKeys.add(key);
-          entry.orderCount++;
-        }
-      });
-    }
-
-    return Object.values(tipoMap).sort((a, b) => b.orderCount - a.orderCount);
-  }
-
-  function renderPromoStats() {
-    const el = document.getElementById('cfgPromoStats');
-    if (!el) return;
-    const stats = computePromoStats();
-    if (stats.length === 0) { el.innerHTML = ''; return; }
-
-    el.innerHTML = `
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Comparativa de Promos</div>
-            <div class="card-subtitle">Total acumulado · ordenado por pedidos</div>
-          </div>
-        </div>
-        <div style="overflow-x:auto"><table class="table">
-          <thead>
-            <tr><th>Tipo</th><th>Pedidos</th><th class="th-hide-mobile">Unidades</th><th>Revenue</th><th class="th-hide-mobile">Formatos</th></tr>
-          </thead>
-          <tbody>
-            ${stats.map(g => `
-              <tr>
-                <td class="font-medium">${escHtml(g.tipo)}</td>
-                <td class="font-semibold">${g.orderCount}</td>
-                <td class="text-sm td-hide-mobile">${g.itemCount || '—'}</td>
-                <td class="text-sm">${g.revenue ? '$' + g.revenue.toLocaleString('es-AR') : '—'}</td>
-                <td class="text-xs td-hide-mobile" style="color:var(--color-text-secondary)">
-                  ${Object.entries(g.formatCounts).map(([fmt, qty]) => `${qty}× ${escHtml(fmt)}`).join(', ') || '—'}
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table></div>
-      </div>
-    `;
-  }
-
   // ─── Util ────────────────────────────────────────────────────────────────────
-  function fmtWeek(dateStr) {
-    if (!dateStr) return '—';
-    try {
-      return new Date(dateStr + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-    } catch { return dateStr; }
-  }
-
   function escHtml(str) {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
