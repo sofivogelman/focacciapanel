@@ -162,6 +162,19 @@ const OrdersModule = (() => {
         <button type="button" class="btn btn-secondary btn-sm mt-2" id="addItemBtn">+ Agregar producto</button>
       </div>
 
+      <div class="form-row" style="margin-top:var(--space-2)">
+        <div class="form-group" style="max-width:340px">
+          <label class="form-label">Promo <span id="fPromoAutoTag" style="font-size:11px;font-weight:400;color:var(--color-primary)"></span></label>
+          <select class="form-select" id="fOrderPromo"
+            onchange="this.dataset.manual='1';const t=document.getElementById('fPromoAutoTag');if(t)t.textContent='· manual'">
+            <option value="">— Sin promo —</option>
+            ${Store.promos.all().map(p =>
+              `<option value="${p.id}" ${isEdit && String(o?.promoId) === String(p.id) ? 'selected' : ''}>${p.name}${p.tipo ? ' — ' + p.tipo : ''}${p.active ? '' : ' ✕'}</option>`
+            ).join('')}
+          </select>
+        </div>
+      </div>
+
       <div class="divider"></div>
 
       <div class="form-row">
@@ -229,6 +242,22 @@ const OrdersModule = (() => {
       ).join('');
     }
 
+    function nrm(s) { return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+    function autoDetectPromo(rows) {
+      const allPromos = Store.promos.all();
+      for (const item of rows) {
+        const fN = nrm(item.format), flN = nrm(item.flavor), nN = nrm(item.name);
+        const all = fN + ' ' + flN + ' ' + nN;
+        if (all.includes('promo 25') || all.includes('promo25'))
+          return String(allPromos.find(p => (nrm(p.name)+' '+nrm(p.tipo||'')).includes('25'))?.id || '');
+        if (flN.includes('degustac') || nN.includes('degustac') || fN.includes('degustac'))
+          return String(allPromos.find(p => (nrm(p.name)+' '+nrm(p.tipo||'')).includes('degustac'))?.id || '');
+        if (fN.includes('familiar') && (flN.includes('individual') || flN.includes('(+')))
+          return String(allPromos.find(p => (nrm(p.name)+' '+nrm(p.tipo||'')).includes('individual'))?.id || '');
+      }
+      return '';
+    }
+
     function recalc() {
       let total = 0;
       const rows = [];
@@ -244,6 +273,13 @@ const OrdersModule = (() => {
       });
       totalEl.textContent = '$' + total.toLocaleString('es-AR');
       hiddenEl.value = JSON.stringify(rows);
+      // Auto-detectar promo (solo si no fue cambiada manualmente)
+      const promoSel = document.getElementById('fOrderPromo');
+      if (promoSel && !promoSel.dataset.manual) {
+        promoSel.value = autoDetectPromo(rows);
+        const tag = document.getElementById('fPromoAutoTag');
+        if (tag) tag.textContent = promoSel.value ? '· auto-detectada' : '';
+      }
     }
 
     function addRow(item = null) {
@@ -311,8 +347,9 @@ const OrdersModule = (() => {
     const zone         = document.getElementById('fOrderZone').value;
     const lote         = document.getElementById('fOrderLote').value.trim();
     const deliveryTime = document.getElementById('fOrderDeliveryTime')?.value || '';
+    const promoId      = document.getElementById('fOrderPromo')?.value || '';
     const total = items.reduce((s, i) => s + i.qty * i.price, 0);
-    const data  = { clientId, clientName: client?.name || '', date, deliveryDate: delivery, deliveryTime, status, items, total, paymentMethod: payment, paid, notes, zone, lote };
+    const data  = { clientId, clientName: client?.name || '', date, deliveryDate: delivery, deliveryTime, promoId, status, items, total, paymentMethod: payment, paid, notes, zone, lote };
 
     if (editId) {
       Store.orders.update(editId, data);
