@@ -335,7 +335,10 @@ const ConfigModule = (() => {
                 ${items.map(p => `
                   <tr>
                     <td class="text-sm td-hide-mobile" style="color:var(--color-text-muted);white-space:nowrap">${p.semana ? fmtWeek(p.semana) : '—'}</td>
-                    <td class="font-medium">${escHtml(p.name)}</td>
+                    <td class="font-medium">
+                      ${escHtml(p.name)}
+                      ${p.esFormato ? '<span class="badge badge-info" style="margin-left:4px;font-size:10px">Formato</span>' : ''}
+                    </td>
                     <td class="text-sm td-hide-mobile">${p.tipo ? `<span class="badge badge-primary">${escHtml(p.tipo)}</span>` : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                     <td class="text-sm td-hide-mobile" style="color:var(--color-text-secondary)">
                       ${(p.items || []).length > 0
@@ -371,6 +374,14 @@ const ConfigModule = (() => {
       : promoItemRow('', 1, formatOptions);
 
     return `
+      <div class="form-group" style="background:var(--color-primary-subtle);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-3)">
+        <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="fPromoEsFormato" ${p?.esFormato ? 'checked' : ''} />
+          <span class="text-sm font-semibold">Mostrar como formato en la página de pedidos</span>
+        </label>
+        <div class="form-hint" style="margin-top:var(--space-1);margin-bottom:0">Activalo si esta promo es un formato de compra propio (ej: Degustación). Al activarla aparece como opción en el dropdown de formato.</div>
+      </div>
+
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Nombre en el pedido *</label>
@@ -410,9 +421,8 @@ const ConfigModule = (() => {
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Notas</label>
-        <input class="form-input" id="fPromoNotes" value="${escHtml(p?.notes || '')}"
-          placeholder="ej: Válida solo los sábados" />
+        <label class="form-label">Descripción <span style="color:var(--color-text-muted);font-weight:400">(aparece en la página de pedidos si está marcada como formato)</span></label>
+        <textarea class="form-input" id="fPromoNotes" rows="2" placeholder="ej: 4 focaccias individuales a elección · precio especial">${escHtml(p?.notes || '')}</textarea>
       </div>
     `;
   }
@@ -457,12 +467,13 @@ const ConfigModule = (() => {
       onConfirm: () => {
         const name  = document.getElementById('fPromoName').value.trim();
         if (!name) { App.toast('error', 'Ingresá el nombre de la promo'); return false; }
-        const tipo   = document.getElementById('fPromoTipo').value.trim();
-        const price  = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
-        const semana = document.getElementById('fPromoSemana')?.value || '';
-        const items  = readPromoItems();
-        const notes  = (document.getElementById('fPromoNotes')?.value || '').trim();
-        Store.promos.create({ name, tipo, price, semana, items, notes, active: true });
+        const tipo      = document.getElementById('fPromoTipo').value.trim();
+        const price     = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
+        const semana    = document.getElementById('fPromoSemana')?.value || '';
+        const items     = readPromoItems();
+        const notes     = (document.getElementById('fPromoNotes')?.value || '').trim();
+        const esFormato = document.getElementById('fPromoEsFormato')?.checked || false;
+        Store.promos.create({ name, tipo, price, semana, items, notes, active: true, esFormato });
         renderPromos();
         return true;
       },
@@ -480,12 +491,13 @@ const ConfigModule = (() => {
       onConfirm: () => {
         const name  = document.getElementById('fPromoName').value.trim();
         if (!name) return false;
-        const tipo   = document.getElementById('fPromoTipo').value.trim();
-        const price  = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
-        const semana = document.getElementById('fPromoSemana')?.value || '';
-        const items  = readPromoItems();
-        const notes  = (document.getElementById('fPromoNotes')?.value || '').trim();
-        Store.promos.update(id, { name, tipo, price, semana, items, notes });
+        const tipo      = document.getElementById('fPromoTipo').value.trim();
+        const price     = parseFloat(document.getElementById('fPromoPrice')?.value) || 0;
+        const semana    = document.getElementById('fPromoSemana')?.value || '';
+        const items     = readPromoItems();
+        const notes     = (document.getElementById('fPromoNotes')?.value || '').trim();
+        const esFormato = document.getElementById('fPromoEsFormato')?.checked || false;
+        Store.promos.update(id, { name, tipo, price, semana, items, notes, esFormato });
         renderPromos();
         return true;
       },
@@ -958,14 +970,15 @@ const ConfigModule = (() => {
     const payload = {
       updated: new Date().toISOString().slice(0, 10),
       promos:  promos.map(p => ({
-        id:     p.id,
-        name:   p.name,
-        tipo:   p.tipo   || '',
-        price:  p.price  || 0,
-        semana: p.semana || '',
-        items:  p.items  || [],
-        notes:  p.notes  || '',
-        active: !!p.active,
+        id:        p.id,
+        name:      p.name,
+        tipo:      p.tipo      || '',
+        price:     p.price     || 0,
+        semana:    p.semana    || '',
+        items:     p.items     || [],
+        notes:     p.notes     || '',
+        active:    !!p.active,
+        esFormato: !!p.esFormato,
       })),
     };
 
