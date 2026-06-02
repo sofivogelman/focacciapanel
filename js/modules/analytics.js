@@ -237,20 +237,21 @@ const AnalyticsModule = (() => {
       const fmtN    = norm(item.format);
       const flavorN = norm(item.flavor);
       const nameN   = norm(item.name);
+      const all     = fmtN + ' ' + flavorN + ' ' + nameN;
 
-      // Regla 1: format contiene "promo" → Promo25
-      if (fmtN.includes('promo')) {
-        return promos.find(p => norm(p.name).includes('promo')) || null;
+      // Regla 1: dice explícitamente "promo 25" o "promo25" → Promo 25 (dos familiares)
+      if (all.includes('promo 25') || all.includes('promo25')) {
+        return promos.find(p => { const pn = norm(p.name) + ' ' + norm(p.tipo || ''); return pn.includes('25'); }) || null;
       }
 
-      // Regla 2: format, flavor o name contiene "degustac" → Degustación
-      if (fmtN.includes('degustac') || flavorN.includes('degustac') || nameN.includes('degustac')) {
-        return promos.find(p => norm(p.name).includes('degustac')) || null;
+      // Regla 2: flavor/name contiene "degustac" → Degustación
+      if (flavorN.includes('degustac') || nameN.includes('degustac') || fmtN.includes('degustac')) {
+        return promos.find(p => { const pn = norm(p.name) + ' ' + norm(p.tipo || ''); return pn.includes('degustac'); }) || null;
       }
 
       // Regla 3: format "familiar" + flavor contiene "individual" → Familiar + Individual
       if (fmtN.includes('familiar') && flavorN.includes('individual')) {
-        return promos.find(p => norm(p.name).includes('individual')) || null;
+        return promos.find(p => { const pn = norm(p.name) + ' ' + norm(p.tipo || ''); return pn.includes('individual'); }) || null;
       }
 
       return null;
