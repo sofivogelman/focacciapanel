@@ -848,36 +848,81 @@ const ConfigModule = (() => {
   // ─── Métricas históricas de promos ───────────────────────────────────────────
   function computePromoStats() {
     const orders = Store.orders.all();
+    const promos = Store.promos.all();
     const tipoMap = {};
 
-    Store.promos.all().forEach(promo => {
+    // Inicializar una entrada por cada promo existente
+    promos.forEach(promo => {
       const key = (promo.tipo || promo.name).toLowerCase();
       if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, orderCount: 0, itemCount: 0, revenue: 0, formatCounts: {} };
+    });
 
-      const promoLow = promo.name.toLowerCase().trim();
-      const entry = tipoMap[key];
+    function norm(s) { return (s || '').toLowerCase().normalize('NFC').trim(); }
 
-      orders.forEach(order => {
-        const matching = (order.items || []).filter(item => {
-          const flavorLow = (item.flavor || '').toLowerCase().trim();
-          const nameLow   = (item.name   || '').toLowerCase().trim();
-          if (flavorLow === promoLow || nameLow === promoLow) return true;
-          return (flavorLow + ' ' + nameLow).includes(promoLow) && promoLow.length > 4;
-        });
-        if (!matching.length) return;
+    function findPromo(item) {
+      const flavorN = norm(item.flavor);
+      const nameN   = norm(item.name);
+      const isPromoFmt = norm(item.format) === 'promo';
 
-        entry.orderCount++;
-        matching.forEach(item => {
-          const qty = item.qty || 1;
-          entry.itemCount += qty;
-          entry.revenue += qty * (item.price || promo.price || 0);
-          const fmt = (item.format || '').trim();
-          if (fmt && fmt.toLowerCase() !== 'promo') {
-            entry.formatCounts[fmt] = (entry.formatCounts[fmt] || 0) + qty;
-          }
-        });
+      // 1) Exact match por nombre/flavor
+      let match = promos.find(p => {
+        const pn = norm(p.name);
+        return pn && (flavorN === pn || nameN === pn);
+      });
+      if (match) return match;
+
+      // 2) Includes match (nombre largo dentro del texto del item)
+      match = promos.find(p => {
+        const pn = norm(p.name);
+        return pn.length > 4 && (flavorN.includes(pn) || nameN.includes(pn));
+      });
+      if (match) return match;
+
+      // 3) Si el formato es 'Promo', buscar por precio exacto
+      if (isPromoFmt) {
+        match = promos.find(p => p.price > 0 && item.price === p.price);
+        if (match) return match;
+      }
+
+      return null;
+    }
+
+    // Recorrer pedido por pedido (cliente por cliente a través de sus pedidos)
+    const clients = Store.clients.all();
+    const processedOrders = new Set();
+
+    // Primero los pedidos asociados a un cliente
+    clients.forEach(client => {
+      orders.filter(o => o.clientId === client.id).forEach(order => {
+        processedOrders.add(order.id);
+        processOrder(order);
       });
     });
+    // Luego los que no tienen cliente asignado
+    orders.filter(o => !processedOrders.has(o.id)).forEach(order => processOrder(order));
+
+    function processOrder(order) {
+      const matchedKeys = new Set();
+      (order.items || []).forEach(item => {
+        const promo = findPromo(item);
+        if (!promo) return;
+        const key = (promo.tipo || promo.name).toLowerCase();
+        const entry = tipoMap[key];
+        if (!entry) return;
+
+        const qty = item.qty || 1;
+        entry.itemCount += qty;
+        entry.revenue   += qty * (item.price || promo.price || 0);
+        const fmt = (item.format || '').trim();
+        if (fmt && norm(fmt) !== 'promo') {
+          entry.formatCounts[fmt] = (entry.formatCounts[fmt] || 0) + qty;
+        }
+        if (!matchedKeys.has(key)) {
+          matchedKeys.add(key);
+          entry.orderCount++;
+        }
+      });
+    }
 
     return Object.values(tipoMap).sort((a, b) => b.orderCount - a.orderCount);
   }
