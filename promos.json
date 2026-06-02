@@ -1,0 +1,54 @@
+{
+  "updated": "2026-06-02",
+  "promos": [
+    {
+      "id": 1,
+      "name": "Familiar + Individual Clásica de regalo",
+      "tipo": "Familiar + Individual Clásica de regalo",
+      "price": 12000,
+      "semana": "2026-05-26",
+      "items": [
+        {
+          "format": "Familiar",
+          "qty": 1
+        },
+        {
+          "format": "Individual",
+          "qty": 1
+        }
+      ],
+      "notes": "",
+      "active": true
+    },
+    {
+      "id": 2,
+      "name": "Promo25 (Promo (25 de Mayo)",
+      "tipo": "2 familiares",
+      "price": 21000,
+      "semana": "2026-05-21",
+      "items": [
+        {
+          "format": "Familiar",
+          "qty": 2
+        }
+      ],
+      "notes": "",
+      "active": true
+    },
+    {
+      "id": 3,
+      "name": "Promo Degustación",
+      "tipo": "4 individuales",
+      "price": 16000,
+      "semana": "2026-05-08",
+      "items": [
+        {
+          "format": "Individual",
+          "qty": 4
+        }
+      ],
+      "notes": "",
+      "active": true
+    }
+  ]
+}
