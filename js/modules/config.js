@@ -884,6 +884,21 @@ const ConfigModule = (() => {
         if (match) return match;
       }
 
+      // 4) Flavor con nota entre paréntesis: "Romero y Sal (con Individual de regalo)"
+      //    → el formato del ítem Y palabras del paréntesis aparecen en el nombre de la promo
+      const parenMatch = flavorN.match(/\(([^)]+)\)/);
+      if (parenMatch) {
+        const parenWords = parenMatch[1].split(/\s+/).filter(w => w.length > 3);
+        const fmtN = norm(item.format);
+        match = promos.find(p => {
+          const pn = norm(p.name);
+          const fmtInPromo = fmtN && pn.includes(fmtN.slice(0, 6));
+          const kwInPromo  = parenWords.some(w => pn.includes(w));
+          return fmtInPromo && kwInPromo;
+        });
+        if (match) return match;
+      }
+
       return null;
     }
 
