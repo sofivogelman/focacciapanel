@@ -854,13 +854,14 @@ const ConfigModule = (() => {
       const key = (promo.tipo || promo.name).toLowerCase();
       if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, semanas: [] };
 
-      // Filtrar pedidos por semana si está definida
+      // Filtrar pedidos por semana de ENTREGA (deliveryDate) si está definida
       let pool = orders;
       if (promo.semana) {
         const start = new Date(promo.semana + 'T00:00:00').getTime();
         const end   = start + 7 * 86400000;
         pool = orders.filter(o => {
-          const t = new Date((o.date || '').slice(0, 10) + 'T00:00:00').getTime();
+          const dateStr = (o.deliveryDate || o.date || '').slice(0, 10);
+          const t = new Date(dateStr + 'T00:00:00').getTime();
           return t >= start && t < end;
         });
       }
@@ -871,8 +872,12 @@ const ConfigModule = (() => {
 
       pool.forEach(order => {
         const matching = (order.items || []).filter(item => {
-          const text = ((item.flavor || '') + ' ' + (item.name || '')).toLowerCase();
-          return text.includes(promoLow);
+          const flavorLow = (item.flavor || '').toLowerCase().trim();
+          const nameLow   = (item.name   || '').toLowerCase().trim();
+          // Exact match primero (items cargados como promo del catálogo)
+          if (flavorLow === promoLow || nameLow === promoLow) return true;
+          // Fallback includes para compatibilidad con datos anteriores
+          return (flavorLow + ' ' + nameLow).includes(promoLow) && promoLow.length > 4;
         });
         if (!matching.length) return;
 
