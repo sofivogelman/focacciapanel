@@ -119,43 +119,39 @@ ${JSON.stringify(ctx)}`;
     if (btn) { btn.disabled = false; btn.textContent = 'Enviar'; }
   }
 
-  function render(container) {
+  // ─── Popup flotante ──────────────────────────────────────────────────────────
+  function renderPopup(container) {
     container.innerHTML = `
-      <div class="fade-in" style="display:flex;flex-direction:column;height:100%">
-        <div class="page-header">
+      <div style="display:flex;flex-direction:column;height:100%">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) var(--space-4);border-bottom:var(--border);flex-shrink:0">
           <div>
-            <h1 class="page-title">Asistente</h1>
-            <p class="page-subtitle">Consultá datos, pedí análisis y obtené insights de tu negocio.</p>
+            <div class="text-sm font-semibold">Asistente IA</div>
+            <div class="text-xs" style="color:var(--color-text-muted)">Consultá datos del negocio</div>
           </div>
+          <button class="btn btn-ghost btn-icon btn-sm" onclick="AgentModule.closePopup()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
-
-        <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:500px">
-
-          <!-- Chat -->
-          <div id="agentChat" style="flex:1;overflow-y:auto;padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3)">
-            <div class="agent-msg agent-msg-bot">
-              <p>¡Hola! Soy tu asistente. Tengo acceso a todos los datos de tu negocio — pedidos, gastos, inventario, clientes y más.<br><br>¿En qué te ayudo hoy?</p>
-            </div>
-            ${history.map(m => renderMsg(m.role, m.text)).join('')}
-          </div>
-
-          <!-- Sugerencias -->
-          <div style="padding:0 var(--space-4);display:flex;flex-wrap:wrap;gap:var(--space-2);border-top:var(--border-light)">
-            ${SUGERENCIAS.map(s => `
-              <button class="btn btn-ghost btn-sm" style="font-size:11px;margin-top:var(--space-2)"
-                onclick="AgentModule.send('${s.replace(/'/g, "\\'")}')">
-                ${s}
-              </button>
-            `).join('')}
-          </div>
-
-          <!-- Input -->
-          <div style="padding:var(--space-4);display:flex;gap:var(--space-3);border-top:var(--border)">
-            <input type="text" class="form-input flex-1" id="agentInput"
-              placeholder="Ej: ¿Cuánto gané en mayo? ¿Qué clientes no compraron este mes?" />
-            <button class="btn btn-primary" id="agentSendBtn" onclick="AgentModule.send()">Enviar</button>
-          </div>
-
+        <!-- Chat -->
+        <div id="agentChat" style="flex:1;overflow-y:auto;padding:var(--space-3);display:flex;flex-direction:column;gap:var(--space-2)">
+          <div class="agent-msg agent-msg-bot"><p>¡Hola! ¿En qué te ayudo hoy?</p></div>
+          ${history.map(m => renderMsg(m.role, m.text)).join('')}
+        </div>
+        <!-- Sugerencias rápidas -->
+        <div style="padding:var(--space-2) var(--space-3);display:flex;flex-wrap:wrap;gap:4px;border-top:1px solid var(--color-border-light)">
+          ${SUGERENCIAS.slice(0, 3).map(s => `
+            <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px;height:auto;line-height:1.6"
+              onclick="AgentModule.send('${s.replace(/'/g, "\\'")}')">
+              ${s}
+            </button>
+          `).join('')}
+        </div>
+        <!-- Input -->
+        <div style="padding:var(--space-3);display:flex;gap:var(--space-2);border-top:var(--border)">
+          <input type="text" class="form-input flex-1" id="agentInput"
+            placeholder="Preguntame algo…" style="font-size:var(--text-sm)" />
+          <button class="btn btn-primary btn-sm" id="agentSendBtn" onclick="AgentModule.send()">Enviar</button>
         </div>
       </div>
     `;
@@ -163,9 +159,30 @@ ${JSON.stringify(ctx)}`;
     document.getElementById('agentInput')?.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
-
-    document.getElementById('agentChat').scrollTop = document.getElementById('agentChat').scrollHeight;
+    const chat = document.getElementById('agentChat');
+    if (chat) chat.scrollTop = chat.scrollHeight;
   }
 
-  return { render, send };
+  function openPopup() {
+    const wrap = document.getElementById('agentPopupWrap');
+    if (!wrap) return;
+    wrap.style.display = 'flex';
+    renderPopup(wrap);
+  }
+
+  function closePopup() {
+    const wrap = document.getElementById('agentPopupWrap');
+    if (wrap) wrap.style.display = 'none';
+  }
+
+  function togglePopup() {
+    const wrap = document.getElementById('agentPopupWrap');
+    if (!wrap) return;
+    wrap.style.display === 'none' ? openPopup() : closePopup();
+  }
+
+  // Mantener render() por compatibilidad (no se usa como ruta pero no rompe nada)
+  function render(container) { renderPopup(container); }
+
+  return { render, send, openPopup, closePopup, togglePopup };
 })();
