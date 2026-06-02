@@ -761,6 +761,49 @@
   }
 }
 
+/* === FLOATING AGENT FAB === */
+.agent-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,.2);
+  z-index: 200;
+  transition: transform .15s, box-shadow .15s;
+}
+.agent-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 18px rgba(0,0,0,.25);
+}
+.agent-popup-wrap {
+  position: fixed;
+  bottom: 84px;
+  right: 24px;
+  width: 380px;
+  height: 490px;
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  display: flex;
+  flex-direction: column;
+  z-index: 199;
+  overflow: hidden;
+}
+@media (max-width: 480px) {
+  .agent-popup-wrap { right:12px;left:12px;width:auto;bottom:72px;height:420px; }
+  .agent-fab { bottom:16px;right:16px; }
+}
+
 /* === ASISTENTE / CHAT === */
 .agent-msg {
   max-width: 82%;
