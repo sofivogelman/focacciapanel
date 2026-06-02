@@ -848,46 +848,61 @@ const ConfigModule = (() => {
   // ─── Métricas históricas de promos ───────────────────────────────────────────
   function computePromoStats() {
     const orders = Store.orders.all();
-    // Agrupar promos por tipo
     const tipoMap = {};
+
     Store.promos.all().forEach(promo => {
       const key = (promo.tipo || promo.name).toLowerCase();
       if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, semanas: [] };
 
+      // Filtrar pedidos por semana si está definida
       let pool = orders;
       if (promo.semana) {
         const start = new Date(promo.semana + 'T00:00:00').getTime();
         const end   = start + 7 * 86400000;
         pool = orders.filter(o => {
-          const t = new Date((o.date || '').slice(0,10) + 'T00:00:00').getTime();
+          const t = new Date((o.date || '').slice(0, 10) + 'T00:00:00').getTime();
           return t >= start && t < end;
         });
       }
 
-      const promoLow = promo.name.toLowerCase();
-      let orderCount = 0, revenue = 0;
+      const promoLow = promo.name.toLowerCase().trim();
+      let orderCount = 0, itemCount = 0, revenue = 0;
       const formatCounts = {};
 
       pool.forEach(order => {
-        const matching = (order.items || []).filter(item =>
-          (item.flavor || item.name || '').toLowerCase().includes(promoLow)
-        );
-        if (matching.length > 0) {
-          orderCount++;
-          revenue += order.total || 0;
-        }
+        const matching = (order.items || []).filter(item => {
+          const text = ((item.flavor || '') + ' ' + (item.name || '')).toLowerCase();
+          return text.includes(promoLow);
+        });
+        if (!matching.length) return;
+
+        orderCount++;
+        matching.forEach(item => {
+          const qty = item.qty || 1;
+          itemCount += qty;
+          // Usar precio del item; si es 0, usar precio definido en la promo
+          revenue += qty * (item.price || promo.price || 0);
+          // Contar por formato real del item
+          const fmt = (item.format || '').trim();
+          if (fmt && fmt.toLowerCase() !== 'promo') {
+            formatCounts[fmt] = (formatCounts[fmt] || 0) + qty;
+          }
+        });
       });
 
-      // Contar unidades por formato del contenido definido
-      (promo.items || []).forEach(pi => {
-        formatCounts[pi.format] = (formatCounts[pi.format] || 0) + pi.qty * orderCount;
-      });
+      // Si no hay formato en los items pero la promo tiene definición, estimarlo
+      if (!Object.keys(formatCounts).length && orderCount > 0) {
+        (promo.items || []).forEach(pi => {
+          if (pi.format) formatCounts[pi.format] = (formatCounts[pi.format] || 0) + pi.qty * orderCount;
+        });
+      }
 
-      tipoMap[key].semanas.push({ promo, orderCount, revenue, formatCounts });
+      tipoMap[key].semanas.push({ promo, orderCount, itemCount, revenue, formatCounts });
     });
 
     return Object.values(tipoMap).map(group => {
       const totalOrders  = group.semanas.reduce((s, w) => s + w.orderCount, 0);
+      const totalItems   = group.semanas.reduce((s, w) => s + w.itemCount, 0);
       const totalRevenue = group.semanas.reduce((s, w) => s + w.revenue, 0);
       const allFormats   = {};
       group.semanas.forEach(w => {
@@ -895,7 +910,7 @@ const ConfigModule = (() => {
           allFormats[fmt] = (allFormats[fmt] || 0) + qty;
         });
       });
-      return { tipo: group.tipo, semanas: group.semanas, totalOrders, totalRevenue, allFormats };
+      return { tipo: group.tipo, semanas: group.semanas, totalOrders, totalItems, totalRevenue, allFormats };
     }).sort((a, b) => b.totalOrders - a.totalOrders);
   }
 
@@ -915,7 +930,7 @@ const ConfigModule = (() => {
         </div>
         <div style="overflow-x:auto"><table class="table">
           <thead>
-            <tr><th>Tipo</th><th class="th-hide-mobile">Contenido</th><th class="th-hide-mobile">Semanas</th><th>Pedidos</th><th>Revenue</th><th class="th-hide-mobile">Desglose por semana</th></tr>
+            <tr><th>Tipo</th><th class="th-hide-mobile">Contenido</th><th class="th-hide-mobile">Semanas</th><th>Pedidos</th><th class="th-hide-mobile">Unidades</th><th>Revenue</th><th class="th-hide-mobile">Desglose por semana</th></tr>
           </thead>
           <tbody>
             ${stats.map(g => `
@@ -926,6 +941,7 @@ const ConfigModule = (() => {
                 </td>
                 <td class="text-sm td-hide-mobile">${g.semanas.length}</td>
                 <td class="font-semibold">${g.totalOrders}</td>
+                <td class="text-sm td-hide-mobile">${g.totalItems || '—'}</td>
                 <td class="text-sm">${g.totalRevenue ? '$' + g.totalRevenue.toLocaleString('es-AR') : '—'}</td>
                 <td class="text-xs td-hide-mobile" style="color:var(--color-text-muted)">
                   ${g.semanas.filter(w => w.orderCount > 0).map(w =>
