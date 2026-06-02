@@ -211,6 +211,112 @@ const AnalyticsModule = (() => {
     render(document.getElementById('pageContent'));
   }
 
+  // ─── Comparativa de Promos ────────────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function computePromoStats() {
+    const orders = Store.orders.all();
+    const promos = Store.promos.all();
+    const tipoMap = {};
+
+    promos.forEach(promo => {
+      const key = (promo.tipo || promo.name).toLowerCase();
+      if (!tipoMap[key]) tipoMap[key] = { tipo: promo.tipo || promo.name, orderCount: 0, itemCount: 0, revenue: 0, formatCounts: {} };
+    });
+
+    function norm(s) { return (s || '').toLowerCase().normalize('NFC').trim(); }
+
+    function findPromo(item) {
+      const flavorN    = norm(item.flavor);
+      const nameN      = norm(item.name);
+      const isPromoFmt = norm(item.format) === 'promo';
+
+      let match = promos.find(p => { const pn = norm(p.name); return pn && (flavorN === pn || nameN === pn); });
+      if (match) return match;
+
+      match = promos.find(p => { const pn = norm(p.name); return pn.length > 4 && (flavorN.includes(pn) || nameN.includes(pn)); });
+      if (match) return match;
+
+      if (isPromoFmt) {
+        match = promos.find(p => p.price > 0 && item.price === p.price);
+        if (match) return match;
+      }
+
+      const parenMatch = flavorN.match(/\(([^)]+)\)/);
+      if (parenMatch) {
+        const parenWords = parenMatch[1].split(/\s+/).filter(w => w.length > 3);
+        const fmtN = norm(item.format);
+        match = promos.find(p => {
+          const pn = norm(p.name);
+          return fmtN && pn.includes(fmtN.slice(0, 6)) && parenWords.some(w => pn.includes(w));
+        });
+        if (match) return match;
+      }
+
+      return null;
+    }
+
+    function processOrder(order) {
+      const matchedKeys = new Set();
+      (order.items || []).forEach(item => {
+        const promo = findPromo(item);
+        if (!promo) return;
+        const key = (promo.tipo || promo.name).toLowerCase();
+        const entry = tipoMap[key];
+        if (!entry) return;
+        const qty = item.qty || 1;
+        entry.itemCount += qty;
+        entry.revenue   += qty * (item.price || promo.price || 0);
+        const fmt = (item.format || '').trim();
+        if (fmt && norm(fmt) !== 'promo') entry.formatCounts[fmt] = (entry.formatCounts[fmt] || 0) + qty;
+        if (!matchedKeys.has(key)) { matchedKeys.add(key); entry.orderCount++; }
+      });
+    }
+
+    const processed = new Set();
+    Store.clients.all().forEach(client => {
+      orders.filter(o => o.clientId === client.id).forEach(o => { processed.add(o.id); processOrder(o); });
+    });
+    orders.filter(o => !processed.has(o.id)).forEach(o => processOrder(o));
+
+    return Object.values(tipoMap).sort((a, b) => b.orderCount - a.orderCount);
+  }
+
+  function renderPromoStats() {
+    const stats = computePromoStats();
+    if (stats.length === 0) return '';
+    return `
+      <div class="card" style="margin-bottom:var(--space-6)">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Comparativa de Promos</div>
+            <div class="card-subtitle">Total acumulado · ordenado por pedidos</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table class="table">
+          <thead>
+            <tr><th>Tipo</th><th>Pedidos</th><th class="th-hide-mobile">Unidades</th><th>Revenue</th><th class="th-hide-mobile">Formatos</th></tr>
+          </thead>
+          <tbody>
+            ${stats.map(g => `
+              <tr>
+                <td class="font-medium">${escHtml(g.tipo)}</td>
+                <td class="font-semibold">${g.orderCount}</td>
+                <td class="text-sm td-hide-mobile">${g.itemCount || '—'}</td>
+                <td class="text-sm">${g.revenue ? '$' + g.revenue.toLocaleString('es-AR') : '—'}</td>
+                <td class="text-xs td-hide-mobile" style="color:var(--color-text-secondary)">
+                  ${Object.entries(g.formatCounts).map(([fmt, qty]) => `${qty}× ${escHtml(fmt)}`).join(', ') || '—'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table></div>
+      </div>
+    `;
+  }
+
   // ─── Render ───────────────────────────────────────────────────────────────────
   function render(container) {
     const { flavors, zones, barrios, repeated, total } = computeData();
@@ -224,6 +330,12 @@ const AnalyticsModule = (() => {
             <h1 class="page-title">Análisis</h1>
             <p class="page-subtitle">Tendencias de sabores, zonas y clientes · ${total} pedido${total !== 1 ? 's' : ''} en total</p>
           </div>
+        </div>
+
+        <!-- Comparativa de Promos — arriba a la izquierda -->
+        <div class="grid-2" style="align-items:start; margin-bottom:var(--space-6)">
+          <div>${renderPromoStats()}</div>
+          <div></div>
         </div>
 
         <div class="grid-2" style="align-items:start; margin-bottom:var(--space-6)">
