@@ -289,7 +289,7 @@ const AnalyticsModule = (() => {
     const stats = computePromoStats();
     if (stats.length === 0) return '';
     return `
-      <div class="card" style="margin-bottom:var(--space-6);max-width:560px">
+      <div class="card" style="margin-bottom:var(--space-6)">
         <div class="card-header">
           <div>
             <div class="card-title">Comparativa de Promos</div>
@@ -333,90 +333,10 @@ const AnalyticsModule = (() => {
           </div>
         </div>
 
-        <!-- Comparativa de Promos — ancho completo -->
-        ${renderPromoStats()}
+        <!-- Fila 1: Comparativa de Promos + Clientes repetidos -->
+        <div class="grid-2" style="align-items:start;margin-bottom:var(--space-6)">
 
-        <div class="grid-2" style="align-items:start; margin-bottom:var(--space-6)">
-
-          <!-- Sabores -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Sabores más pedidos</div>
-                <div class="card-subtitle">4 sabores · degustación = 1 de cada uno</div>
-              </div>
-              ${flavors[0]?.[1] > 0 ? `<span class="badge badge-primary">${flavors[0][0]}</span>` : ''}
-            </div>
-            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
-              ${flavors.map(([label, val]) => {
-                const pct = maxFlavor > 0 ? Math.round((val / maxFlavor) * 100) : 0;
-                return `
-                  <div style="display:flex;align-items:center;gap:var(--space-3)">
-                    <div style="width:170px;font-size:var(--text-xs);color:var(--color-text-secondary);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0">${label}</div>
-                    <div style="flex:1;height:10px;background:var(--color-border-light);border-radius:var(--radius-full);overflow:hidden">
-                      <div style="height:100%;width:${pct}%;background:var(--color-primary);border-radius:var(--radius-full);transition:width .4s ease"></div>
-                    </div>
-                    <div style="width:28px;font-size:var(--text-xs);font-weight:600;color:${val > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'}">${val}</div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-            ${flavors.some(([, v]) => v > 0) ? `
-              <div class="divider"></div>
-              <div class="d-flex gap-4 text-xs" style="color:var(--color-text-muted)">
-                <div><span class="font-medium" style="color:var(--color-success)">↑ Más pedido:</span> ${flavors[0][0]} (${flavors[0][1]} u.)</div>
-                <div><span class="font-medium">↓ Menos:</span> ${flavors[flavors.length - 1][0]} (${flavors[flavors.length - 1][1]} u.)</div>
-              </div>
-            ` : ''}
-          </div>
-
-          <!-- Zonas -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Zonas de entrega</div>
-                <div class="card-subtitle">Pedidos por zona</div>
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
-              ${barChart(zones, maxZone, 'var(--color-accent)')}
-            </div>
-          </div>
-        </div>
-
-        <div class="grid-2" style="align-items:start">
-
-          <!-- Barrios de Villa Nueva -->
-          <div class="card">
-            <div class="card-header">
-              <div>
-                <div class="card-title">Barrios — Villa Nueva</div>
-                <div class="card-subtitle">${barrios.length} barrio${barrios.length !== 1 ? 's' : ''} registrado${barrios.length !== 1 ? 's' : ''}</div>
-              </div>
-              <button class="btn btn-sm btn-primary" onclick="AnalyticsModule.addBarrio()">+ Barrio</button>
-            </div>
-            ${barrios.length === 0 ? `
-              <div class="empty-state" style="padding:var(--space-4)">
-                <div class="empty-state-title">Sin barrios todavía</div>
-                <p class="empty-state-text">Usá "+ Barrio" para agregar barrios de Villa Nueva.</p>
-              </div>
-            ` : `
-              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
-                ${barrios.map(([name, id, count]) => `
-                  <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light)">
-                    <div>
-                      <div class="text-sm font-medium">${name}</div>
-                      <div class="text-xs" style="color:var(--color-text-muted)">${count} pedido${count !== 1 ? 's' : ''}</div>
-                    </div>
-                    <button class="btn btn-ghost btn-icon btn-sm" onclick="AnalyticsModule.removeBarrio(${id})" title="Eliminar barrio">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  </div>
-                `).join('')}
-              </div>
-              <div class="form-hint mt-3">Asigná el barrio desde el detalle de cada pedido.</div>
-            `}
-          </div>
+          ${renderPromoStats().replace('margin-bottom:var(--space-6)', '')}
 
           <!-- Clientes repetidos -->
           <div class="card">
@@ -447,6 +367,90 @@ const AnalyticsModule = (() => {
               </div>
             `}
           </div>
+        </div>
+
+        <!-- Fila 2: Sabores + Zonas -->
+        <div class="grid-2" style="align-items:start;margin-bottom:var(--space-6)">
+
+          <!-- Sabores -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Sabores más pedidos</div>
+                <div class="card-subtitle">4 sabores · degustación = 1 de cada uno</div>
+              </div>
+              ${flavors[0]?.[1] > 0 ? `<span class="badge badge-primary">${flavors[0][0]}</span>` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+              ${flavors.map(([label, val]) => {
+                const pct = maxFlavor > 0 ? Math.round((val / maxFlavor) * 100) : 0;
+                return `
+                  <div style="display:flex;align-items:center;gap:var(--space-3)">
+                    <div style="width:160px;font-size:var(--text-xs);color:var(--color-text-secondary);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0">${label}</div>
+                    <div style="flex:1;height:10px;background:var(--color-border-light);border-radius:var(--radius-full);overflow:hidden">
+                      <div style="height:100%;width:${pct}%;background:var(--color-primary);border-radius:var(--radius-full);transition:width .4s ease"></div>
+                    </div>
+                    <div style="width:28px;font-size:var(--text-xs);font-weight:600;color:${val > 0 ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'}">${val}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            ${flavors.some(([, v]) => v > 0) ? `
+              <div class="divider"></div>
+              <div class="d-flex gap-4 text-xs" style="color:var(--color-text-muted)">
+                <div><span class="font-medium" style="color:var(--color-success)">↑ Más pedido:</span> ${flavors[0][0]} (${flavors[0][1]} u.)</div>
+                <div><span class="font-medium">↓ Menos:</span> ${flavors[flavors.length-1][0]} (${flavors[flavors.length-1][1]} u.)</div>
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Zonas -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Zonas de entrega</div>
+                <div class="card-subtitle">Pedidos por zona</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--space-3)">
+              ${barChart(zones, maxZone, 'var(--color-accent)')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Fila 3: Barrios -->
+        <div class="grid-2" style="align-items:start;margin-bottom:var(--space-6)">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Barrios — Villa Nueva</div>
+                <div class="card-subtitle">${barrios.length} barrio${barrios.length !== 1 ? 's' : ''} registrado${barrios.length !== 1 ? 's' : ''}</div>
+              </div>
+              <button class="btn btn-sm btn-primary" onclick="AnalyticsModule.addBarrio()">+ Barrio</button>
+            </div>
+            ${barrios.length === 0 ? `
+              <div class="empty-state" style="padding:var(--space-4)">
+                <div class="empty-state-title">Sin barrios todavía</div>
+                <p class="empty-state-text">Usá "+ Barrio" para agregar barrios de Villa Nueva.</p>
+              </div>
+            ` : `
+              <div style="display:flex;flex-direction:column;gap:var(--space-2)">
+                ${barrios.map(([name, id, count]) => `
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border-light)">
+                    <div>
+                      <div class="text-sm font-medium">${name}</div>
+                      <div class="text-xs" style="color:var(--color-text-muted)">${count} pedido${count !== 1 ? 's' : ''}</div>
+                    </div>
+                    <button class="btn btn-ghost btn-icon btn-sm" onclick="AnalyticsModule.removeBarrio(${id})" title="Eliminar barrio">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+              <div class="form-hint mt-3">Asigná el barrio desde el detalle de cada pedido.</div>
+            `}
+          </div>
+          <div></div>
         </div>
       </div>
     `;
