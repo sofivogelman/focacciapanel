@@ -12,7 +12,6 @@ const Router = (() => {
     repartos:  { title: 'Repartos',     module: () => DeliveriesModule, primaryLabel: 'Registrar salida', primaryRoute: null },
     produccion: { title: 'Producción',   module: () => ProductionModule,  primaryLabel: 'Registrar masa', primaryRoute: null },
     analisis:   { title: 'Análisis',     module: () => AnalyticsModule,  primaryLabel: '',              primaryRoute: null },
-    agente:     { title: 'Asistente',    module: () => AgentModule,       primaryLabel: '',              primaryRoute: null },
     config:    { title: 'Configuración', module: () => ConfigModule,      primaryLabel: '',              primaryRoute: null },
   };
 
@@ -26,6 +25,11 @@ const Router = (() => {
     document.querySelectorAll('.nav-item').forEach(el => {
       el.classList.toggle('active', el.dataset.route === route);
     });
+
+    // FAB del asistente — solo visible en dashboard
+    const agentFloat = document.getElementById('agentFloat');
+    if (agentFloat) agentFloat.style.display = route === 'dashboard' ? '' : 'none';
+    if (route !== 'dashboard') AgentModule?.closePopup?.();
 
     // Update topbar
     document.getElementById('topbarTitle').textContent = routes[route].title;
