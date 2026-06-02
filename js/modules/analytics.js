@@ -229,39 +229,38 @@ const AnalyticsModule = (() => {
     function norm(s) { return (s || '').toLowerCase().normalize('NFC').trim(); }
 
     function findPromo(item) {
-      const flavorN    = norm(item.flavor);
-      const nameN      = norm(item.name);
-      const isPromoFmt = norm(item.format) === 'promo';
+      const fmtN    = norm(item.format);
+      const flavorN = norm(item.flavor);
+      const nameN   = norm(item.name);
 
-      let match = promos.find(p => { const pn = norm(p.name); return pn && (flavorN === pn || nameN === pn); });
+      // Regla 1: el formato del item coincide con el nombre de la promo
+      // (ej: format="Promo25" → promo cuyo nombre es "Promo25"; format="Degustación" → promo "Degustación")
+      let match = promos.find(p => {
+        const pn = norm(p.name);
+        return pn.length > 2 && (fmtN === pn || fmtN.includes(pn) || pn.includes(fmtN) && fmtN.length > 2);
+      });
       if (match) return match;
 
-      match = promos.find(p => { const pn = norm(p.name); return pn.length > 4 && (flavorN.includes(pn) || nameN.includes(pn)); });
+      // Regla 2: el flavor/name del item coincide con el nombre de la promo
+      // (cuando se selecciona desde el catálogo del panel: flavor = promo.name)
+      match = promos.find(p => {
+        const pn = norm(p.name);
+        return pn.length > 3 && (flavorN === pn || nameN === pn || flavorN.includes(pn) || nameN.includes(pn));
+      });
       if (match) return match;
 
-      if (isPromoFmt) {
-        match = promos.find(p => p.price > 0 && item.price === p.price);
+      // Regla 3: el flavor contiene "individual" → promo Familiar + Individual
+      if (flavorN.includes('individual')) {
+        match = promos.find(p => norm(p.name).includes('individual'));
         if (match) return match;
       }
 
-      const parenMatch = flavorN.match(/\(([^)]+)\)/);
-      if (parenMatch) {
-        const parenWords = parenMatch[1].split(/\s+/).filter(w => w.length > 3);
-        const fmtN = norm(item.format);
-        match = promos.find(p => {
-          const pn = norm(p.name);
-          return fmtN && pn.includes(fmtN.slice(0, 6)) && parenWords.some(w => pn.includes(w));
-        });
-        if (match) return match;
-      }
-
+      // El resto no es de ninguna promo
       return null;
     }
 
     function processOrder(order) {
       const matchedKeys = new Set();
-
-      // Estrategias 1-4: por item individual
       (order.items || []).forEach(item => {
         const promo = findPromo(item);
         if (!promo) return;
@@ -275,39 +274,6 @@ const AnalyticsModule = (() => {
         if (fmt && norm(fmt) !== 'promo') entry.formatCounts[fmt] = (entry.formatCounts[fmt] || 0) + qty;
         if (!matchedKeys.has(key)) { matchedKeys.add(key); entry.orderCount++; }
       });
-
-      // Estrategia 5: matching por composición de formatos del pedido
-      // (ej: 1× Familiar + 1× Individual con precio 0 → "Familiar + Individual Clásica de regalo")
-      if (matchedKeys.size === 0) {
-        const fmtCounts = {};
-        (order.items || []).forEach(i => {
-          const f = norm(i.format);
-          if (f && f !== 'promo') fmtCounts[f] = (fmtCounts[f] || 0) + (i.qty || 1);
-        });
-
-        const compositePromo = promos.find(p => {
-          if (!(p.items || []).length) return false;
-          return p.items.every(pi => {
-            const f = norm(pi.format);
-            return f && (fmtCounts[f] || 0) >= (pi.qty || 1);
-          });
-        });
-
-        if (compositePromo) {
-          const key = (compositePromo.tipo || compositePromo.name).toLowerCase();
-          const entry = tipoMap[key];
-          if (entry && !matchedKeys.has(key)) {
-            matchedKeys.add(key);
-            entry.orderCount++;
-            entry.revenue += compositePromo.price || order.total || 0;
-            (compositePromo.items || []).forEach(pi => {
-              const f = (pi.format || '').trim();
-              if (f) entry.formatCounts[f] = (entry.formatCounts[f] || 0) + (pi.qty || 1);
-              entry.itemCount += (pi.qty || 1);
-            });
-          }
-        }
-      }
     }
 
     const processed = new Set();
