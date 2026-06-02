@@ -20,6 +20,38 @@ const ConfigModule = (() => {
       <div id="cfgFlavorRecipes" style="margin-top:var(--space-6)"></div>
       <div id="cfgPromoStats" style="margin-top:var(--space-6)"></div>
 
+      <!-- Página de pedidos -->
+      <div class="card" style="margin-top:var(--space-6)">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Página de pedidos</div>
+            <div class="card-subtitle">Publicá las promos activas para que aparezcan automáticamente en tu página de pedidos</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="ConfigModule.publishPromos()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+            Publicar promos activas
+          </button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+          <div class="form-row" style="max-width:480px">
+            <div class="form-group">
+              <label class="form-label">GitHub token (con permiso <code>repo</code>)</label>
+              <input type="password" class="form-input" id="cfgGhToken" value="${localStorage.getItem('focaccia_github_token') || ''}" placeholder="ghp_…" autocomplete="off" />
+              <div class="form-hint">Crealo en github.com → Settings → Developer settings → Personal access tokens → scope <strong>repo</strong>. Se guarda solo en este dispositivo.</div>
+            </div>
+          </div>
+          <div>
+            <button class="btn btn-secondary btn-sm" onclick="ConfigModule.saveGhToken()">Guardar token</button>
+          </div>
+          <div id="cfgPromoPublishStatus" style="display:none"></div>
+          <div style="background:var(--color-bg);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4)">
+            <div class="text-xs font-semibold" style="color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--space-2)">URL pública de las promos</div>
+            <code class="text-xs" style="word-break:break-all;color:var(--color-primary)">https://raw.githubusercontent.com/sofivogelman/focacciapanel/main/promos.json</code>
+            <div class="form-hint" style="margin-top:var(--space-2)">Tu página de pedidos tiene que leer esta URL para mostrar las promos activas.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- IA para comprobantes -->
       <div class="card" style="margin-top:var(--space-6)">
         <div class="card-header">
@@ -465,6 +497,8 @@ const ConfigModule = (() => {
     if (!p) return;
     Store.promos.update(id, { active: !p.active });
     renderPromos();
+    // Auto-publicar si hay token configurado
+    if (localStorage.getItem('focaccia_github_token')) publishPromos();
   }
 
   function deletePromo(id) {
@@ -906,6 +940,64 @@ const ConfigModule = (() => {
     return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // ─── Publicación de promos a página de pedidos ───────────────────────────────
+  function saveGhToken() {
+    const val = document.getElementById('cfgGhToken')?.value.trim() || '';
+    localStorage.setItem('focaccia_github_token', val);
+    App.toast('success', val ? 'Token guardado' : 'Token eliminado');
+  }
+
+  async function publishPromos() {
+    const token = localStorage.getItem('focaccia_github_token') || '';
+    if (!token) {
+      App.toast('error', 'Primero guardá tu GitHub token en esta sección');
+      return;
+    }
+
+    const promos  = Store.promos.all();
+    const payload = {
+      updated: new Date().toISOString().slice(0, 10),
+      promos:  promos.map(p => ({
+        id:     p.id,
+        name:   p.name,
+        tipo:   p.tipo   || '',
+        price:  p.price  || 0,
+        semana: p.semana || '',
+        items:  p.items  || [],
+        notes:  p.notes  || '',
+        active: !!p.active,
+      })),
+    };
+
+    const content = JSON.stringify(payload, null, 2);
+    const b64     = btoa(unescape(encodeURIComponent(content)));
+    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' };
+    const apiUrl  = 'https://api.github.com/repos/sofivogelman/focacciapanel/contents/promos.json';
+
+    const statusEl = document.getElementById('cfgPromoPublishStatus');
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.innerHTML = '<span class="text-sm text-muted">Publicando…</span>'; }
+
+    try {
+      const existing = await fetch(apiUrl, { headers }).then(r => r.ok ? r.json() : null);
+      const body     = { message: 'chore: update active promos', content: b64 };
+      if (existing?.sha) body.sha = existing.sha;
+
+      const res = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+      if (res.ok) {
+        const active = promos.filter(p => p.active).length;
+        App.toast('success', `Promos publicadas — ${active} activa${active !== 1 ? 's' : ''}, ${promos.length - active} inactiva${promos.length - active !== 1 ? 's' : ''}`);
+        if (statusEl) statusEl.innerHTML = `<span class="text-xs text-success">✓ Publicado ${new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' })}</span>`;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        App.toast('error', 'Error al publicar: ' + (err.message || res.status));
+        if (statusEl) statusEl.innerHTML = `<span class="text-xs text-danger">✗ Error ${res.status}</span>`;
+      }
+    } catch (e) {
+      App.toast('error', 'Error de red al publicar');
+      if (statusEl) statusEl.innerHTML = `<span class="text-xs text-danger">✗ Error de red</span>`;
+    }
+  }
+
   function saveGeminiKey() {
     const key = document.getElementById('cfgGeminiKey')?.value.trim() || '';
     localStorage.setItem('focaccia_gemini_key', key);
@@ -921,5 +1013,6 @@ const ConfigModule = (() => {
     openAddFlavorRecipe, editFlavorRecipe, deleteFlavorRecipe, loadStandardToppings,
     resolveFlavor, resolvePromo,
     saveGeminiKey,
+    saveGhToken, publishPromos,
   };
 })();
