@@ -260,6 +260,8 @@ const AnalyticsModule = (() => {
 
     function processOrder(order) {
       const matchedKeys = new Set();
+
+      // Estrategias 1-4: por item individual
       (order.items || []).forEach(item => {
         const promo = findPromo(item);
         if (!promo) return;
@@ -273,6 +275,39 @@ const AnalyticsModule = (() => {
         if (fmt && norm(fmt) !== 'promo') entry.formatCounts[fmt] = (entry.formatCounts[fmt] || 0) + qty;
         if (!matchedKeys.has(key)) { matchedKeys.add(key); entry.orderCount++; }
       });
+
+      // Estrategia 5: matching por composición de formatos del pedido
+      // (ej: 1× Familiar + 1× Individual con precio 0 → "Familiar + Individual Clásica de regalo")
+      if (matchedKeys.size === 0) {
+        const fmtCounts = {};
+        (order.items || []).forEach(i => {
+          const f = norm(i.format);
+          if (f && f !== 'promo') fmtCounts[f] = (fmtCounts[f] || 0) + (i.qty || 1);
+        });
+
+        const compositePromo = promos.find(p => {
+          if (!(p.items || []).length) return false;
+          return p.items.every(pi => {
+            const f = norm(pi.format);
+            return f && (fmtCounts[f] || 0) >= (pi.qty || 1);
+          });
+        });
+
+        if (compositePromo) {
+          const key = (compositePromo.tipo || compositePromo.name).toLowerCase();
+          const entry = tipoMap[key];
+          if (entry && !matchedKeys.has(key)) {
+            matchedKeys.add(key);
+            entry.orderCount++;
+            entry.revenue += compositePromo.price || order.total || 0;
+            (compositePromo.items || []).forEach(pi => {
+              const f = (pi.format || '').trim();
+              if (f) entry.formatCounts[f] = (entry.formatCounts[f] || 0) + (pi.qty || 1);
+              entry.itemCount += (pi.qty || 1);
+            });
+          }
+        }
+      }
     }
 
     const processed = new Set();
@@ -288,7 +323,7 @@ const AnalyticsModule = (() => {
     const stats = computePromoStats();
     if (stats.length === 0) return '';
     return `
-      <div class="card" style="margin-bottom:var(--space-6)">
+      <div class="card" style="margin-bottom:var(--space-6);max-width:560px">
         <div class="card-header">
           <div>
             <div class="card-title">Comparativa de Promos</div>
@@ -332,11 +367,8 @@ const AnalyticsModule = (() => {
           </div>
         </div>
 
-        <!-- Comparativa de Promos — arriba a la izquierda -->
-        <div class="grid-2" style="align-items:start; margin-bottom:var(--space-6)">
-          <div>${renderPromoStats()}</div>
-          <div></div>
-        </div>
+        <!-- Comparativa de Promos — ancho completo -->
+        ${renderPromoStats()}
 
         <div class="grid-2" style="align-items:start; margin-bottom:var(--space-6)">
 
