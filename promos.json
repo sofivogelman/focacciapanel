@@ -18,7 +18,8 @@
         }
       ],
       "notes": "",
-      "active": false
+      "active": false,
+      "esFormato": false
     },
     {
       "id": 2,
@@ -33,7 +34,8 @@
         }
       ],
       "notes": "",
-      "active": false
+      "active": false,
+      "esFormato": false
     },
     {
       "id": 3,
@@ -48,7 +50,8 @@
         }
       ],
       "notes": "",
-      "active": true
+      "active": true,
+      "esFormato": true
     }
   ]
 }
