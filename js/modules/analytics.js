@@ -259,8 +259,12 @@ const AnalyticsModule = (() => {
 
     function processOrder(order) {
       const matchedKeys = new Set();
+      // Si el pedido tiene promo asignada explícitamente, tiene prioridad sobre la detección por items
+      const manualPromo = order.promoId
+        ? promos.find(p => String(p.id) === String(order.promoId))
+        : null;
       (order.items || []).forEach(item => {
-        const promo = findPromo(item);
+        const promo = manualPromo || findPromo(item);
         if (!promo) return;
         const key = (promo.tipo || promo.name).toLowerCase();
         const entry = tipoMap[key];
