@@ -102,12 +102,10 @@ const ProductionModule = (() => {
             <h1 class="page-title">Producción</h1>
             <p class="page-subtitle">Masa necesaria para pedidos pendientes · bolsas de 1kg</p>
           </div>
-          ${pending.length > 0 ? `
             <button class="btn btn-primary" onclick="ProductionModule.openMasaModal()">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-              Registrar masa hecha
-            </button>
-          ` : ''}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Registrar masa hecha
+          </button>
         </div>
 
         ${plan.length === 0 ? `
@@ -202,10 +200,11 @@ const ProductionModule = (() => {
 
   // ─── Modal global: cuántas bolsas hice hoy ───────────────────────────────────
   function openMasaModal() {
-    const plan    = computePlan();
-    const pending = plan.filter(p => !p.completa);
-    if (!pending.length) { App.toast('error', 'No hay pedidos pendientes de masa'); return; }
-    const totalNec = pending.reduce((s, p) => s + p.bolsasPendientes, 0);
+    const plan       = computePlan();
+    const pending    = plan.filter(p => !p.completa);
+    const hasPending = pending.length > 0;
+    const totalNec   = hasPending ? pending.reduce((s, p) => s + p.bolsasPendientes, 0) : 1;
+    const todayISO   = new Date().toISOString().split('T')[0];
 
     App.openModal({
       title: 'Registrar masa hecha',
@@ -214,16 +213,33 @@ const ProductionModule = (() => {
           <label class="form-label">¿Cuántas bolsas de 1kg harina hiciste?</label>
           <input class="form-input" id="fMasaBolsas" type="number" min="1" step="1" value="${totalNec}"
             style="font-size:var(--text-xl);text-align:center;height:48px"
-            oninput="ProductionModule.previewDist(parseInt(this.value)||0)" />
-          <div class="form-hint">${totalNec} bolsa${totalNec !== 1 ? 's' : ''} necesarias para cubrir todos los pedidos pendientes</div>
+            ${hasPending ? `oninput="ProductionModule.previewDist(parseInt(this.value)||0)"` : ''} />
+          <div class="form-hint">${hasPending
+            ? `${totalNec} bolsa${totalNec !== 1 ? 's' : ''} necesarias para cubrir todos los pedidos pendientes`
+            : 'Sin pedidos pendientes — elegí para qué entrega es esta masa'
+          }</div>
         </div>
-        <div id="masaDistPreview" style="margin-top:var(--space-4)"></div>
+        ${!hasPending ? `
+          <div class="form-group">
+            <label class="form-label">Fecha de entrega</label>
+            <input class="form-input" id="fMasaDate" type="date" value="${todayISO}" />
+          </div>
+        ` : ''}
+        ${hasPending ? `<div id="masaDistPreview" style="margin-top:var(--space-4)"></div>` : ''}
       `,
-      primaryLabel: 'Registrar y distribuir',
-      onOpen: () => previewDist(totalNec),
+      primaryLabel: hasPending ? 'Registrar y distribuir' : 'Registrar',
+      onOpen: hasPending ? () => previewDist(totalNec) : null,
       onConfirm: () => {
         const bolsas = parseInt(document.getElementById('fMasaBolsas').value) || 0;
         if (bolsas <= 0) { App.toast('error', 'Ingresá la cantidad de bolsas'); return false; }
+        if (!hasPending) {
+          const date = document.getElementById('fMasaDate')?.value;
+          if (!date) { App.toast('error', 'Elegí una fecha de entrega'); return false; }
+          Store.masaLog.create({ deliveryDate: date, grams: bolsas * MASA_POR_BOLSA, bolsas });
+          App.toast('success', `${bolsas} bolsa${bolsas !== 1 ? 's' : ''} registrada${bolsas !== 1 ? 's' : ''} para ${fmtDate(date)}`);
+          render(document.getElementById('pageContent'));
+          return true;
+        }
         commitDistribution(bolsas);
         return true;
       },
