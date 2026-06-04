@@ -15,6 +15,13 @@ const DriveSync = (() => {
     'deliveries','flavors','formats','promos','barriosVN','masaLog','recipes',
   ];
 
+  // Claves planas de config que también deben migrar entre dispositivos
+  const CONFIG_KEYS = [
+    'focaccia_github_token',
+    'focaccia_gemini_key',
+    'focaccia_sync_config',
+  ];
+
   // ─── localStorage helpers ─────────────────────────────────────────────────────
   function getFileId() { return localStorage.getItem(FILE_ID_KEY); }
   function setFileId(id) { localStorage.setItem(FILE_ID_KEY, id); }
@@ -23,6 +30,10 @@ const DriveSync = (() => {
   function exportData() {
     const out = { exportedAt: new Date().toISOString() };
     COLLECTIONS.forEach(name => { out[name] = Store[name].all(); });
+    CONFIG_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v !== null) out[k] = v;
+    });
     return JSON.stringify(out);
   }
 
@@ -32,6 +43,9 @@ const DriveSync = (() => {
       if (Array.isArray(data[name])) {
         localStorage.setItem('focaccia_' + name, JSON.stringify(data[name]));
       }
+    });
+    CONFIG_KEYS.forEach(k => {
+      if (data[k] != null) localStorage.setItem(k, data[k]);
     });
   }
 
