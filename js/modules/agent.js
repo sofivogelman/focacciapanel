@@ -5,29 +5,41 @@ const AgentModule = (() => {
   // ─── Contexto del negocio ─────────────────────────────────────────────────────
   function buildContext() {
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 90);
+    cutoff.setDate(cutoff.getDate() - 60);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
     const orders   = Store.orders.all();
     const expenses = Store.expenses.all();
 
+    // Resumir pedidos: solo campos relevantes, sin texto interno largo
+    const trimOrder = o => ({
+      id: o.id, fecha: o.date, entrega: o.deliveryDate, estado: o.status,
+      cliente: o.clientName, total: o.total, pago: o.paymentMethod, cobrado: o.paid,
+      zona: o.zone,
+      items: (o.items || []).map(i => ({ formato: i.format, sabor: i.flavor, qty: i.qty, precio: i.price })),
+    });
+
+    const recentOrders = orders
+      .filter(o => (o.date || '') >= cutoffStr || o.status === 'pendiente')
+      .slice(-50)
+      .map(trimOrder);
+
     return {
-      fecha_hoy:    new Date().toISOString().slice(0, 10),
-      pedidos:      orders.filter(o => (o.date || '') >= cutoffStr || o.status === 'pendiente'),
-      gastos:       expenses.filter(e => (e.date || '') >= cutoffStr),
-      ingredientes: Store.ingredients.all(),
-      repartos:     Store.deliveries.all(),
-      clientes:     Store.clients.all(),
-      masaLog:      Store.masaLog.all(),
-      promos:       Store.promos.all(),
-      formatos:     Store.formats.all(),
-      sabores:      Store.flavors.all(),
+      fecha_hoy: new Date().toISOString().slice(0, 10),
       resumen: {
-        total_pedidos:    orders.length,
+        total_pedidos_historico: orders.length,
         pedidos_pendientes: orders.filter(o => o.status === 'pendiente').length,
-        total_clientes:   Store.clients.count(),
+        pedidos_entregados_60d: orders.filter(o => o.status === 'entregado' && (o.date || '') >= cutoffStr).length,
+        total_clientes: Store.clients.count(),
         ingredientes_stock_bajo: Store.ingredients.where(i => i.stock <= i.minStock).length,
       },
+      pedidos_recientes: recentOrders,
+      gastos_recientes: expenses.filter(e => (e.date || '') >= cutoffStr).slice(-30),
+      clientes: Store.clients.all().map(c => ({ id: c.id, nombre: c.name, zona: c.zone, pedidos: c.orderCount })),
+      ingredientes: Store.ingredients.all().map(i => ({ nombre: i.name, stock: i.stock, minimo: i.minStock, unidad: i.unit })),
+      promos: Store.promos.all(),
+      sabores: Store.flavors.all().map(f => f.name),
+      formatos: Store.formats.all().map(f => f.name),
     };
   }
 
@@ -37,37 +49,39 @@ const AgentModule = (() => {
     if (!key) return 'Para usar el asistente necesitás configurar tu clave de Gemini en **Configuración → Detección automática de comprobantes**.';
 
     const ctx = buildContext();
-    const systemPrompt = `Sos un asistente experto en análisis de negocios para una emprendedora de focaccia artesanal en Argentina. Tenés acceso completo a los datos de su negocio.
+    const systemPrompt = `Sos un asistente experto en análisis de negocios para una emprendedora de focaccia artesanal en Argentina. Tenés acceso a los datos de su negocio (últimos 60 días + pendientes).
 
 Reglas:
-- Respondé siempre en español argentino, de forma clara y directa
-- Usá números concretos cuando los tenés en los datos
-- Si algo no está en los datos, decilo claramente
-- Podés hacer cálculos, comparaciones, rankings y recomendaciones
-- Formateo: usá **negrita** para números importantes, listas con guiones para rankings
+- Respondé en español argentino, de forma clara y directa
+- Usá números concretos de los datos
+- Si algo no está en los datos, decilo
+- Usá **negrita** para números importantes y guiones para rankings
 
-DATOS DEL NEGOCIO (últimos 90 días + pendientes):
-${JSON.stringify(ctx)}`;
+DATOS: ${JSON.stringify(ctx)}`;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            { role: 'user', parts: [{ text: systemPrompt + '\n\nPREGUNTA: ' + question }] }
-          ],
-        }),
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: question }] }],
+            generationConfig: { maxOutputTokens: 1024, temperature: 0.3 },
+          }),
+        }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error?.message || `Error ${res.status}`;
+        return `Error al conectar con Gemini: ${msg}`;
       }
-    );
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return `Error ${res.status}: ${err.error?.message || 'No se pudo conectar con Gemini'}`;
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta del asistente.';
+    } catch (e) {
+      return `Error de red: ${e.message}`;
     }
-    const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
   }
 
   // ─── UI ───────────────────────────────────────────────────────────────────────
