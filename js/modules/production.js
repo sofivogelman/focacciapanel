@@ -14,25 +14,22 @@ const ProductionModule = (() => {
     return Store.masaLog.all().reduce((s, l) => s + (l.grams || 0), 0);
   }
 
-  // ─── Masa comprometida por pedidos activos (no entregados ni cancelados) ─────
-  function getMasaNecesaria() {
-    const active = Store.orders.where(o =>
-      o.status !== 'cancelado' && o.status !== 'entregado'
-    );
-    let grams = 0;
-    active.forEach(order => {
-      (order.items || []).forEach(item => {
+  // ─── Gramos de masa para un conjunto de pedidos ───────────────────────────────
+  function masaDeOrders(orders) {
+    let g = 0;
+    orders.forEach(o => {
+      (o.items || []).forEach(item => {
         const fmt = (item.format || '').toLowerCase();
         const qty = item.qty || 1;
         if (fmt === 'familiar') {
-          grams += qty * MASA_G.familiar;
-          if (tieneRegalo(item.flavor)) grams += qty * MASA_G.individual;
+          g += qty * MASA_G.familiar;
+          if (tieneRegalo(item.flavor)) g += qty * MASA_G.individual;
         } else if (fmt === 'individual') {
-          grams += qty * MASA_G.individual;
+          g += qty * MASA_G.individual;
         }
       });
     });
-    return grams;
+    return g;
   }
 
   // ─── Pedidos activos agrupados por fecha de entrega ──────────────────────────
@@ -79,14 +76,17 @@ const ProductionModule = (() => {
 
   // ─── Render principal ─────────────────────────────────────────────────────────
   function render(container) {
-    const masaTotal     = getMasaTotal();
-    const masaNecesaria = getMasaNecesaria();
-    const masaLibre     = masaTotal - masaNecesaria;
-    const deficit       = masaLibre < 0;
-    const bolsasFaltan  = deficit ? toBolsas(Math.abs(masaLibre)) : 0;
-    const porFecha      = getPedidosPorFecha();
+    const masaTotal        = getMasaTotal();
+    const masaConsumida    = masaDeOrders(Store.orders.where(o => o.status === 'entregado'));
+    const masaComprometida = masaDeOrders(Store.orders.where(o => o.status !== 'cancelado' && o.status !== 'entregado'));
+    const masaEnStock      = masaTotal - masaConsumida;   // lo que físicamente queda
+    const masaLibre        = masaEnStock - masaComprometida; // libre para nuevos pedidos
+    const deficit          = masaLibre < 0;
+    const bolsasFaltan     = deficit ? toBolsas(Math.abs(masaLibre)) : 0;
+    const porFecha         = getPedidosPorFecha();
 
     const fmtBolsas = g => {
+      if (g <= 0) return '0';
       const b = g / MASA_POR_BOLSA;
       return b % 1 === 0 ? b.toString() : b.toFixed(1);
     };
@@ -108,21 +108,21 @@ const ProductionModule = (() => {
         <div class="card" style="margin-bottom:var(--space-4)">
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-4);padding:var(--space-2) 0">
             <div>
-              <div class="stat-label">Masa hecha</div>
-              <div class="stat-value" style="font-size:var(--text-2xl)">${fmtBolsas(masaTotal)} bolsas</div>
-              <div class="stat-meta">${masaTotal}g acumulados</div>
+              <div class="stat-label">En stock</div>
+              <div class="stat-value" style="font-size:var(--text-2xl)">${fmtBolsas(masaEnStock)} bolsas</div>
+              <div class="stat-meta">${masaEnStock}g · ${fmtBolsas(masaConsumida)} usadas en entregas</div>
             </div>
             <div>
               <div class="stat-label">Comprometida</div>
-              <div class="stat-value" style="font-size:var(--text-2xl)">${fmtBolsas(masaNecesaria)} bolsas</div>
-              <div class="stat-meta">${masaNecesaria}g · ${porFecha.length} fecha${porFecha.length !== 1 ? 's' : ''} activa${porFecha.length !== 1 ? 's' : ''}</div>
+              <div class="stat-value" style="font-size:var(--text-2xl)">${fmtBolsas(masaComprometida)} bolsas</div>
+              <div class="stat-meta">${masaComprometida}g · ${porFecha.length} fecha${porFecha.length !== 1 ? 's' : ''} activa${porFecha.length !== 1 ? 's' : ''}</div>
             </div>
             <div>
-              <div class="stat-label">Disponible</div>
-              <div class="stat-value" style="font-size:var(--text-2xl);color:${deficit ? 'var(--color-danger)' : masaLibre === 0 && masaTotal > 0 ? 'var(--color-warning)' : 'var(--color-success)'}">
+              <div class="stat-label">Libre</div>
+              <div class="stat-value" style="font-size:var(--text-2xl);color:${deficit ? 'var(--color-danger)' : masaLibre === 0 && masaEnStock > 0 ? 'var(--color-warning)' : 'var(--color-success)'}">
                 ${deficit ? '−' + fmtBolsas(Math.abs(masaLibre)) : fmtBolsas(masaLibre)} bolsas
               </div>
-              <div class="stat-meta">${deficit ? Math.abs(masaLibre) + 'g de déficit' : masaLibre + 'g libres'}</div>
+              <div class="stat-meta">${deficit ? Math.abs(masaLibre) + 'g de déficit' : masaLibre + 'g disponibles'}</div>
             </div>
           </div>
 
@@ -131,12 +131,12 @@ const ProductionModule = (() => {
               <div>
                 <div style="font-size:var(--text-sm);font-weight:600;color:var(--color-danger)">Necesitás hacer más masa</div>
                 <div style="font-size:var(--text-xs);color:var(--color-text-secondary);margin-top:2px">
-                  Falta masa para <strong>${bolsasFaltan} bolsa${bolsasFaltan !== 1 ? 's' : ''}</strong> (${Math.abs(masaLibre)}g) para cubrir todos los pedidos activos
+                  Faltan <strong>${bolsasFaltan} bolsa${bolsasFaltan !== 1 ? 's' : ''}</strong> (${Math.abs(masaLibre)}g) para cubrir todos los pedidos activos
                 </div>
               </div>
               <button class="btn btn-sm btn-danger" onclick="ProductionModule.openMasaModal()">Registrar</button>
             </div>
-          ` : masaTotal > 0 ? `
+          ` : masaEnStock > 0 ? `
             <div style="margin-top:var(--space-4);background:var(--color-success-bg,#edf5ea);border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4)">
               <div style="font-size:var(--text-sm);font-weight:500;color:var(--color-success)">✓ Masa suficiente para todos los pedidos activos</div>
             </div>
