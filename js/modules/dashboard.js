@@ -13,103 +13,58 @@ const DashboardModule = (() => {
 
   function fmt(n) { return '$' + n.toLocaleString('es-AR'); }
 
-  // ─── Recordatorio de masa ────────────────────────────────────────────────────
+  // ─── Recordatorio de masa (modelo pool) ──────────────────────────────────────
   function renderMasaReminder() {
-    const MASA_G           = { familiar: 900, individual: 280 };
-    const MASA_POR_BOLSA   = 1910;
-    const HARINA_POR_BOLSA = 1000;
-    const MS_HOUR          = 60 * 60 * 1000;
+    const MASA_G         = { familiar: 900, individual: 280 };
+    const MASA_POR_BOLSA = 1910;
 
     function tieneRegalo(flavor) {
       const f = (flavor || '').toLowerCase();
       return f.includes('regalo') && !f.includes('sin individual') && !f.includes('romero');
     }
 
-    const pending = Store.orders.where(o => o.status === 'pendiente');
-    if (pending.length === 0) return '';
-
-    const byDate = {};
-    pending.forEach(order => {
-      // Solo usamos deliveryDate — no fallback a order.date (que es la fecha del pedido, no entrega)
-      const date = order.deliveryDate || '';
-      if (!date) return;
-      if (!byDate[date]) byDate[date] = { familiares: 0, individuales: 0, regalo: 0 };
-      (order.items || []).forEach(item => {
-        const f = (item.format || '').toLowerCase();
-        const qty = item.qty || 1;
-        if (f === 'familiar') {
-          byDate[date].familiares += qty;
-          if (tieneRegalo(item.flavor)) byDate[date].regalo += qty;
-        } else if (f === 'individual') {
-          byDate[date].individuales += qty;
-        }
+    function masaDeOrders(orders) {
+      let g = 0;
+      orders.forEach(o => {
+        (o.items || []).forEach(item => {
+          const fmt = (item.format || '').toLowerCase();
+          const qty = item.qty || 1;
+          if (fmt === 'familiar') {
+            g += qty * MASA_G.familiar;
+            if (tieneRegalo(item.flavor)) g += qty * MASA_G.individual;
+          } else if (fmt === 'individual') {
+            g += qty * MASA_G.individual;
+          }
+        });
       });
-    });
+      return g;
+    }
 
-    const now = new Date();
-    let overflow = 0;
+    const masaTotal        = Store.masaLog.all().reduce((s, l) => s + (l.grams || 0), 0);
+    const masaConsumida    = masaDeOrders(Store.orders.where(o => o.status === 'entregado'));
+    const masaEnStock      = masaTotal - masaConsumida;
+    const masaComprometida = masaDeOrders(Store.orders.where(o => o.status !== 'cancelado' && o.status !== 'entregado'));
+    const masaLibre        = masaEnStock - masaComprometida;
 
-    const reminders = Object.entries(byDate)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, c]) => {
-        const masaNeta     = c.familiares * MASA_G.familiar + (c.individuales + c.regalo) * MASA_G.individual;
-        const bolsas       = Math.ceil(masaNeta / MASA_POR_BOLSA);
-        const masaFinal    = bolsas * MASA_POR_BOLSA;
-        const masaLograda  = Store.masaLog.where(l => l.deliveryDate === date).reduce((s, l) => s + (l.grams || 0), 0);
-        const masaHecha    = masaLograda + overflow;
-        overflow           = Math.max(0, masaHecha - masaFinal);
-        const masaPendiente = Math.max(0, masaFinal - masaHecha);
-        const bolsasPend   = Math.ceil(masaPendiente / MASA_POR_BOLSA);
-        const completa     = masaHecha >= masaFinal && masaFinal > 0;
+    if (masaLibre >= 0 || masaComprometida === 0) return '';
 
-        // deadline = exactamente 48 horas antes del mediodía de entrega
-        const deliveryD  = new Date(date + 'T12:00:00');
-        const deadline   = new Date(deliveryD.getTime() - 48 * MS_HOUR);
-        // horas hasta el deadline (positivo = todavía hay tiempo, negativo = ya pasó)
-        const hoursLeft  = (deadline - now) / MS_HOUR;
-
-        return { date, masaPendiente, bolsasPend, harinaFinal: bolsasPend * HARINA_POR_BOLSA, completa, deliveryD, deadline, hoursLeft };
-      })
-      // excluir completas, sin pendiente, y entregas ya pasadas
-      .filter(r => !r.completa && r.masaPendiente > 0 && r.deliveryD > now);
-
-    if (reminders.length === 0) return '';
-
-    const fmtD = d => d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+    const bolsasFaltan = Math.ceil(Math.abs(masaLibre) / MASA_POR_BOLSA);
 
     return `
-      <div class="card" style="margin-bottom:var(--space-6); border-color:var(--color-primary)">
+      <div class="card" style="margin-bottom:var(--space-6);border-color:var(--color-danger)">
         <div class="card-header">
           <div>
-            <div class="card-title">Próxima masa a preparar</div>
-            <div class="card-subtitle">Planificá 48hs antes de cada entrega</div>
+            <div class="card-title" style="color:var(--color-danger)">Necesitás hacer masa</div>
+            <div class="card-subtitle">No alcanza para cubrir los pedidos activos</div>
           </div>
           <button class="btn btn-ghost btn-sm" onclick="Router.navigate('produccion')">Ver producción</button>
         </div>
-        ${reminders.slice(0, 3).map(r => {
-          const overdue  = r.hoursLeft < 0;
-          const todayDue = r.hoursLeft >= 0 && r.hoursLeft < 24;
-          const tomorDue = r.hoursLeft >= 24 && r.hoursLeft < 48;
-          const color = overdue ? 'var(--color-danger)' : todayDue ? 'var(--color-warning)' : 'var(--color-text-primary)';
-          let label;
-          if (overdue)       label = `Debería estar hecha — entrega ${fmtD(r.deliveryD)}`;
-          else if (todayDue) label = `Hacerla hoy — entrega ${fmtD(r.deliveryD)}`;
-          else if (tomorDue) label = `Hacerla mañana — entrega ${fmtD(r.deliveryD)}`;
-          else               label = `Antes del ${fmtD(r.deadline)} — entrega ${fmtD(r.deliveryD)}`;
-
-          return `
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);padding:var(--space-3) 0;border-bottom:1px solid var(--color-border-light)">
-              <div>
-                <div class="text-sm font-semibold" style="color:${color};text-transform:capitalize">${label}</div>
-                <div class="text-xs" style="color:var(--color-text-muted);margin-top:2px">
-                  ${r.bolsasPend} bolsa${r.bolsasPend !== 1 ? 's' : ''} de 1kg · ${r.harinaFinal}g harina → ${r.masaPendiente}g masa
-                </div>
-              </div>
-              ${overdue  ? '<span class="badge badge-danger">Urgente</span>' : ''}
-              ${todayDue ? '<span class="badge badge-warning">Hoy</span>'   : ''}
-            </div>
-          `;
-        }).join('')}
+        <div style="background:var(--color-danger-bg);border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4)">
+          <div style="font-size:var(--text-sm)">
+            Faltan <strong>${bolsasFaltan} bolsa${bolsasFaltan !== 1 ? 's' : ''}</strong> de 1kg ·
+            En stock: ${masaEnStock}g · Comprometida: ${masaComprometida}g
+          </div>
+        </div>
       </div>
     `;
   }
