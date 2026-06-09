@@ -1,12 +1,23 @@
 const ProductionModule = (() => {
 
-  const MASA_G = { familiar: 900, individual: 280 };
+  const MASA_G = { grande: 900, mediana: 350, chica: 280 };
   const MASA_POR_BOLSA   = 1910;
   const HARINA_POR_BOLSA = 1000;
 
   function tieneRegalo(flavor) {
     const f = (flavor || '').toLowerCase();
     return f.includes('regalo') && !f.includes('sin individual') && !f.includes('romero');
+  }
+
+  // Devuelve gramos para un nombre de formato — compatible con nombres viejos y nuevos
+  function getMasaGrams(formatName) {
+    const stored = Store.formats.where(f => f.name === formatName)[0];
+    if (stored?.grams) return stored.grams;
+    const n = (formatName || '').toLowerCase();
+    if (n.includes('puglia') || n.includes('familiar')) return MASA_G.grande;
+    if (n.includes('amalfi') || n.includes('17'))       return MASA_G.mediana;
+    if (n.includes('capri')  || n.includes('individual')) return MASA_G.chica;
+    return 0;
   }
 
   // ─── Masa total acumulada en el log ──────────────────────────────────────────
@@ -19,13 +30,11 @@ const ProductionModule = (() => {
     let g = 0;
     orders.forEach(o => {
       (o.items || []).forEach(item => {
-        const fmt = (item.format || '').toLowerCase();
         const qty = item.qty || 1;
-        if (fmt === 'familiar') {
-          g += qty * MASA_G.familiar;
-          if (tieneRegalo(item.flavor)) g += qty * MASA_G.individual;
-        } else if (fmt === 'individual') {
-          g += qty * MASA_G.individual;
+        g += qty * getMasaGrams(item.format);
+        const n = (item.format || '').toLowerCase();
+        if ((n.includes('puglia') || n.includes('familiar')) && tieneRegalo(item.flavor)) {
+          g += qty * MASA_G.chica;
         }
       });
     });
@@ -40,21 +49,14 @@ const ProductionModule = (() => {
     const byDate = {};
     active.forEach(order => {
       const date = order.deliveryDate || order.date || '—';
-      if (!byDate[date]) byDate[date] = { pedidos: [], grams: 0, familiares: 0, individuales: 0, regalo: 0 };
+      if (!byDate[date]) byDate[date] = { pedidos: [], grams: 0 };
       byDate[date].pedidos.push(order);
       (order.items || []).forEach(item => {
-        const fmt = (item.format || '').toLowerCase();
         const qty = item.qty || 1;
-        if (fmt === 'familiar') {
-          byDate[date].familiares += qty;
-          byDate[date].grams += qty * MASA_G.familiar;
-          if (tieneRegalo(item.flavor)) {
-            byDate[date].regalo += qty;
-            byDate[date].grams += qty * MASA_G.individual;
-          }
-        } else if (fmt === 'individual') {
-          byDate[date].individuales += qty;
-          byDate[date].grams += qty * MASA_G.individual;
+        byDate[date].grams += qty * getMasaGrams(item.format);
+        const n = (item.format || '').toLowerCase();
+        if ((n.includes('puglia') || n.includes('familiar')) && tieneRegalo(item.flavor)) {
+          byDate[date].grams += qty * MASA_G.chica;
         }
       });
     });
