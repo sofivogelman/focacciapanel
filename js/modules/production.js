@@ -147,32 +147,67 @@ const ProductionModule = (() => {
           `}
         </div>
 
-        <!-- Pedidos por fecha -->
-        ${porFecha.length > 0 ? `
-          <div class="card" style="margin-bottom:var(--space-4)">
-            <div class="card-header"><div class="card-title">Pedidos activos por fecha</div></div>
-            ${porFecha.map((d, i) => `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) 0${i < porFecha.length - 1 ? ';border-bottom:var(--border-light)' : ''}">
-                <div>
-                  <div style="font-size:var(--text-sm);font-weight:500;text-transform:capitalize">${fmtDate(d.date)}</div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-muted)">
-                    ${d.pedidos.length} pedido${d.pedidos.length !== 1 ? 's' : ''}
-                    ${d.familiares ? ' · ' + d.familiares + '× Familiar' : ''}
-                    ${d.individuales ? ' · ' + d.individuales + '× Individual' : ''}
-                    ${d.regalo ? ' · ' + d.regalo + '× regalo' : ''}
-                  </div>
-                </div>
-                <div style="text-align:right">
-                  <div style="font-size:var(--text-sm);font-weight:500">${toBolsas(d.grams)} bolsa${toBolsas(d.grams) !== 1 ? 's' : ''}</div>
-                  <div style="font-size:var(--text-xs);color:var(--color-text-muted)">${d.grams}g · ${toBolsas(d.grams) * HARINA_POR_BOLSA}g harina</div>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        ` : ''}
+        <!-- Pedidos que cuentan en "comprometida" -->
+        ${renderPedidosComprometidos()}
 
         <!-- Historial de masa -->
         ${renderMasaLog()}
+      </div>
+    `;
+  }
+
+  // ─── Pedidos contados en masa comprometida ───────────────────────────────────
+  function renderPedidosComprometidos() {
+    const STATUS_LABEL = {
+      pendiente:      ['badge-warning',  'Pendiente'],
+      en_preparacion: ['badge-info',     'En preparación'],
+      listo:          ['badge-primary',  'Listo'],
+    };
+
+    const activos = Store.orders
+      .where(o => o.status !== 'cancelado' && o.status !== 'entregado')
+      .sort((a, b) => (a.deliveryDate || a.date || '').localeCompare(b.deliveryDate || b.date || ''));
+
+    if (!activos.length) return '';
+
+    const rows = activos.map(o => {
+      const masaO = masaDeOrders([o]);
+      const [badgeCls, badgeLabel] = STATUS_LABEL[o.status] || ['badge-default', o.status];
+      const itemsStr = (o.items || [])
+        .filter(i => ['familiar','individual'].includes((i.format||'').toLowerCase()))
+        .map(i => `${i.qty||1}× ${i.format}`)
+        .join(', ') || '—';
+      const entrega = o.deliveryDate
+        ? new Date(o.deliveryDate + 'T12:00:00').toLocaleDateString('es-AR', { day:'numeric', month:'short' })
+        : '—';
+
+      return `
+        <div style="display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:var(--border-light)">
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap">
+              <span style="font-size:var(--text-sm);font-weight:500">${o.clientName || '—'}</span>
+              <span class="badge ${badgeCls}" style="font-size:10px">${badgeLabel}</span>
+            </div>
+            <div style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:2px">
+              Entrega: ${entrega} · ${itemsStr} · <strong>${masaO}g</strong>
+            </div>
+          </div>
+          <button class="btn btn-xs btn-secondary" onclick="ProductionModule.marcarEntregado(${o.id})" title="Marcar como entregado">
+            Entregado ✓
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="card" style="margin-bottom:var(--space-4)">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Pedidos contados en masa comprometida</div>
+            <div class="card-subtitle">Estos ${activos.length} pedido${activos.length !== 1 ? 's' : ''} no están marcados como entregados ni cancelados</div>
+          </div>
+        </div>
+        <div>${rows}</div>
       </div>
     `;
   }
@@ -261,5 +296,11 @@ const ProductionModule = (() => {
     render(document.getElementById('pageContent'));
   }
 
-  return { render, openMasaModal, removeLog, clearAllMasa, openCreateModal: openMasaModal };
+  function marcarEntregado(id) {
+    Store.orders.update(id, { status: 'entregado' });
+    App.toast('success', 'Pedido marcado como entregado');
+    render(document.getElementById('pageContent'));
+  }
+
+  return { render, openMasaModal, removeLog, clearAllMasa, marcarEntregado, openCreateModal: openMasaModal };
 })();
