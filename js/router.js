@@ -12,6 +12,7 @@ const Router = (() => {
     repartos:  { title: 'Repartos',     module: () => DeliveriesModule, primaryLabel: 'Registrar salida', primaryRoute: null },
     produccion: { title: 'Producción',   module: () => ProductionModule,  primaryLabel: 'Registrar masa', primaryRoute: null },
     analisis:   { title: 'Análisis',     module: () => AnalyticsModule,  primaryLabel: '',              primaryRoute: null },
+    promo:      { title: 'Mensaje WA',   module: () => PromoMsgModule,   primaryLabel: '',              primaryRoute: null },
     config:    { title: 'Configuración', module: () => ConfigModule,      primaryLabel: '',              primaryRoute: null },
   };
 
