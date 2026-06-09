@@ -15,7 +15,7 @@ const DashboardModule = (() => {
 
   // ─── Recordatorio de masa (modelo pool) ──────────────────────────────────────
   function renderMasaReminder() {
-    const MASA_G         = { familiar: 900, individual: 280 };
+    const MASA_G         = { grande: 900, mediana: 350, chica: 280 };
     const MASA_POR_BOLSA = 1910;
 
     function tieneRegalo(flavor) {
@@ -23,17 +23,25 @@ const DashboardModule = (() => {
       return f.includes('regalo') && !f.includes('sin individual') && !f.includes('romero');
     }
 
+    function getMasaGrams(formatName) {
+      const stored = Store.formats.where(f => f.name === formatName)[0];
+      if (stored?.grams) return stored.grams;
+      const n = (formatName || '').toLowerCase();
+      if (n.includes('puglia') || n.includes('familiar')) return MASA_G.grande;
+      if (n.includes('amalfi') || n.includes('17'))       return MASA_G.mediana;
+      if (n.includes('capri')  || n.includes('individual')) return MASA_G.chica;
+      return 0;
+    }
+
     function masaDeOrders(orders) {
       let g = 0;
       orders.forEach(o => {
         (o.items || []).forEach(item => {
-          const fmt = (item.format || '').toLowerCase();
           const qty = item.qty || 1;
-          if (fmt === 'familiar') {
-            g += qty * MASA_G.familiar;
-            if (tieneRegalo(item.flavor)) g += qty * MASA_G.individual;
-          } else if (fmt === 'individual') {
-            g += qty * MASA_G.individual;
+          g += qty * getMasaGrams(item.format);
+          const n = (item.format || '').toLowerCase();
+          if ((n.includes('puglia') || n.includes('familiar')) && tieneRegalo(item.flavor)) {
+            g += qty * MASA_G.chica;
           }
         });
       });
