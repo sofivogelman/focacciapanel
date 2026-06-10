@@ -48,8 +48,17 @@ const DashboardModule = (() => {
       return g;
     }
 
-    const masaTotal        = Store.masaLog.all().reduce((s, l) => s + (l.grams || 0), 0);
-    const masaConsumida    = masaDeOrders(Store.orders.where(o => o.status === 'entregado'));
+    const masaTotal = Store.masaLog.all().reduce((s, l) => s + (l.grams || 0), 0);
+    const logs = Store.masaLog.all();
+    let trackingStart = null;
+    if (logs.length) {
+      const earliest = logs.reduce((min, l) => Math.min(min, l.createdAt || 0), Infinity);
+      const d = new Date(earliest);
+      trackingStart = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+    const masaConsumida = trackingStart
+      ? masaDeOrders(Store.orders.where(o => o.status === 'entregado' && (o.deliveryDate || o.date || '') >= trackingStart))
+      : 0;
     const masaEnStock      = masaTotal - masaConsumida;
     const masaComprometida = masaDeOrders(Store.orders.where(o => o.status !== 'cancelado' && o.status !== 'entregado'));
     const masaLibre        = masaEnStock - masaComprometida;
