@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Doblez — Mundial 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #111;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 48px 24px;
+    }
+
+    /* ── Flyer ──────────────────────────────────────────── */
+    .flyer {
+      width: 600px;
+      background: #0c2017;
+      position: relative;
+      overflow: hidden;
+      color: #f0ead6;
+    }
+
+    /* Outer gold border */
+    .flyer::before {
+      content: '';
+      position: absolute;
+      inset: 10px;
+      border: 1px solid rgba(212,163,40,.35);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Subtle noise texture overlay */
+    .flyer::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── SVG corner ornaments ───────────────────────────── */
+    .corner {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      z-index: 2;
+      opacity: .55;
+    }
+    .tl { top: 6px;  left: 6px; }
+    .tr { top: 6px;  right: 6px;  transform: scaleX(-1); }
+    .bl { bottom: 6px; left: 6px;  transform: scaleY(-1); }
+    .br { bottom: 6px; right: 6px; transform: scale(-1,-1); }
+
+    /* ── Inner layout ───────────────────────────────────── */
+    .inner {
+      position: relative;
+      z-index: 3;
+      padding: 52px 56px 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* Brand */
+    .brand-name {
+      font-family: 'Cinzel', serif;
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      color: #f0ead6;
+      line-height: 1;
+    }
+    .brand-sub {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 13.5px;
+      letter-spacing: .14em;
+      color: rgba(212,163,40,.75);
+      margin-top: 7px;
+    }
+
+    /* Dividers */
+    .divider {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 22px 0;
+    }
+    .div-line { flex: 1; height: 1px; background: rgba(212,163,40,.28); }
+    .div-diamond {
+      width: 6px; height: 6px;
+      background: rgba(212,163,40,.5);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }
+
+    /* Logo */
+    .logo-wrap {
+      position: relative;
+      margin-bottom: 6px;
+    }
+    .logo-img {
+      width: 216px;
+      height: 216px;
+      object-fit: contain;
+      border-radius: 50%;
+      filter: drop-shadow(0 0 24px rgba(212,163,40,.28))
+              drop-shadow(0 4px 16px rgba(0,0,0,.5));
+    }
+    /* CSS logo placeholder — shown only when img fails */
+    .logo-fallback {
+      display: none;
+      width: 216px;
+      height: 216px;
+      border-radius: 50%;
+      border: 2.5px solid rgba(212,163,40,.6);
+      background: radial-gradient(circle at 40% 35%, rgba(212,163,40,.12), transparent 70%);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .logo-img[data-broken] + .logo-fallback { display: flex; }
+
+    .edition-badge {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 13px;
+      letter-spacing: .1em;
+      color: rgba(212,163,40,.8);
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    /* Products section */
+    .products {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 4px;
+    }
+
+    .product {
+      border: 1px solid rgba(212,163,40,.2);
+      border-left: 2.5px solid rgba(212,163,40,.7);
+      background: rgba(255,255,255,.038);
+      padding: 18px 20px 16px;
+    }
+
+    .product-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 9px;
+      gap: 12px;
+    }
+
+    .product-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 17.5px;
+      color: #f0ead6;
+      letter-spacing: .015em;
+    }
+
+    .product-emoji {
+      font-size: 16px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .product-price {
+      font-family: 'Cinzel', serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #d4a328;
+      white-space: nowrap;
+      flex-shrink: 0;
+      letter-spacing: .06em;
+    }
+
+    .product-desc {
+      font-family: 'EB Garamond', serif;
+      font-size: 14.5px;
+      line-height: 1.62;
+      color: rgba(240,234,214,.78);
+    }
+    .product-desc strong {
+      color: rgba(240,234,214,.96);
+      font-weight: 500;
+    }
+
+    .product-tagline {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 13px;
+      color: rgba(212,163,40,.68);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    /* Flag stripe accent — thin Argentine colors top/bottom */
+    .stripe {
+      position: absolute;
+      left: 0; right: 0;
+      height: 3px;
+      display: flex;
+      z-index: 4;
+    }
+    .stripe-top { top: 0; }
+    .stripe-bot { bottom: 0; }
+    .stripe > span { flex: 1; }
+
+    /* Footer */
+    .footer {
+      width: 100%;
+      margin-top: 26px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(212,163,40,.18);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .footer-pre {
+      font-family: 'EB Garamond', serif;
+      font-size: 11.5px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: rgba(240,234,214,.45);
+    }
+    .footer-contact {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: .1em;
+      color: rgba(212,163,40,.6);
+    }
+
+    /* Print/screenshot hint */
+    .hint {
+      margin-top: 20px;
+      text-align: center;
+      font-family: sans-serif;
+      font-size: 11px;
+      color: #555;
+    }
+    @media print { .hint { display: none; } }
+  </style>
+</head>
+<body>
+
+<div>
+<div class="flyer">
+
+  <!-- Argentine flag stripe top -->
+  <div class="stripe stripe-top">
+    <span style="background:#74acdf"></span>
+    <span style="background:#fff"></span>
+    <span style="background:#74acdf"></span>
+  </div>
+
+  <!-- Corner SVG ornaments -->
+  <svg class="corner tl" viewBox="0 0 56 56" fill="none">
+    <path d="M4 52 L4 4 L52 4" stroke="#d4a328" stroke-width="1.5"/>
+    <path d="M4 4 C4 16 16 4 16 4" stroke="#d4a328" stroke-width="1" fill="none" opacity=".6"/>
+    <circle cx="4" cy="4" r="2.5" fill="#d4a328" opacity=".7"/>
+    <circle cx="4" cy="52" r="2.5" fill="#d4a328" opacity=".4"/>
+    <circle cx="52" cy="4" r="2.5" fill="#d4a328" opacity=".4"/>
+  </svg>
+  <svg class="corner tr" viewBox="0 0 56 56" fill="none">
+    <path d="M4 52 L4 4 L52 4" stroke="#d4a328" stroke-width="1.5"/>
+    <path d="M4 4 C4 16 16 4 16 4" stroke="#d4a328" stroke-width="1" fill="none" opacity=".6"/>
+    <circle cx="4" cy="4" r="2.5" fill="#d4a328" opacity=".7"/>
+    <circle cx="4" cy="52" r="2.5" fill="#d4a328" opacity=".4"/>
+    <circle cx="52" cy="4" r="2.5" fill="#d4a328" opacity=".4"/>
+  </svg>
+  <svg class="corner bl" viewBox="0 0 56 56" fill="none">
+    <path d="M4 52 L4 4 L52 4" stroke="#d4a328" stroke-width="1.5"/>
+    <path d="M4 4 C4 16 16 4 16 4" stroke="#d4a328" stroke-width="1" fill="none" opacity=".6"/>
+    <circle cx="4" cy="4" r="2.5" fill="#d4a328" opacity=".7"/>
+    <circle cx="4" cy="52" r="2.5" fill="#d4a328" opacity=".4"/>
+    <circle cx="52" cy="4" r="2.5" fill="#d4a328" opacity=".4"/>
+  </svg>
+  <svg class="corner br" viewBox="0 0 56 56" fill="none">
+    <path d="M4 52 L4 4 L52 4" stroke="#d4a328" stroke-width="1.5"/>
+    <path d="M4 4 C4 16 16 4 16 4" stroke="#d4a328" stroke-width="1" fill="none" opacity=".6"/>
+    <circle cx="4" cy="4" r="2.5" fill="#d4a328" opacity=".7"/>
+    <circle cx="4" cy="52" r="2.5" fill="#d4a328" opacity=".4"/>
+    <circle cx="52" cy="4" r="2.5" fill="#d4a328" opacity=".4"/>
+  </svg>
+
+  <div class="inner">
+
+    <!-- Brand header -->
+    <div style="text-align:center">
+      <div class="brand-name">DOBLEZ</div>
+      <div class="brand-sub">focacceria artesanal</div>
+    </div>
+
+    <div class="divider">
+      <div class="div-line"></div>
+      <div class="div-diamond"></div>
+      <div class="div-diamond"></div>
+      <div class="div-diamond"></div>
+      <div class="div-line"></div>
+    </div>
+
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <img class="logo-img"
+           src="../assets/logo-mundial.png"
+           alt="Doblez — Edición Mundial 2026"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="logo-fallback">
+        <span style="font-size:32px">⭐⭐⭐</span>
+        <span style="font-family:'Cinzel',serif;font-size:18px;color:#d4a328;letter-spacing:.14em">DOBLEZ</span>
+        <span style="font-family:'EB Garamond',serif;font-style:italic;font-size:12px;color:rgba(240,234,214,.6);margin-top:2px">Mundial 2026</span>
+      </div>
+    </div>
+
+    <div class="edition-badge">✦&nbsp;&nbsp;Edición Especial del Mundial 2026&nbsp;&nbsp;✦</div>
+
+    <div class="divider" style="margin: 20px 0 22px">
+      <div class="div-line"></div>
+      <div class="div-diamond"></div>
+      <div class="div-line"></div>
+    </div>
+
+    <!-- Products -->
+    <div class="products">
+
+      <div class="product">
+        <div class="product-row">
+          <div>
+            <span class="product-name">Box Mundialista</span>
+            <span class="product-emoji">⚽</span>
+          </div>
+          <div class="product-price">$30.000</div>
+        </div>
+        <div class="product-desc">
+          Para dos. Dos focaccias <strong>Capri</strong> a tu elección, una picada para compartir y un <strong>Malbec</strong>.
+        </div>
+        <div class="product-tagline">Todo lo que necesitás para la noche del partido.</div>
+      </div>
+
+      <div class="product">
+        <div class="product-row">
+          <div>
+            <span class="product-name">La Previa</span>
+            <span class="product-emoji">🍷</span>
+          </div>
+          <div class="product-price">$20.000</div>
+        </div>
+        <div class="product-desc">
+          Una <strong>Puglia</strong> artesanal a tu elección y un <strong>Malbec</strong>.
+        </div>
+        <div class="product-tagline">Porque la mejor previa empieza con buena comida.</div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-pre">Pedidos con 24 hs de anticipación</div>
+      <div class="footer-contact">wa.me/5491122339340 &nbsp;·&nbsp; Zona Norte</div>
+    </div>
+
+  </div>
+
+  <!-- Argentine flag stripe bottom -->
+  <div class="stripe stripe-bot">
+    <span style="background:#74acdf"></span>
+    <span style="background:#fff"></span>
+    <span style="background:#74acdf"></span>
+  </div>
+
+</div>
+
+<div class="hint">
+  Guardá el logo como <code style="background:#222;color:#aaa;padding:1px 6px;border-radius:3px">assets/logo-mundial.png</code>
+  para que aparezca — después screenshotear con F11 + recorte de pantalla
+</div>
+</div>
+
+</body>
+</html>
