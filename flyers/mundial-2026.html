@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>Doblez — Mundial 2026</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -315,17 +315,122 @@
       <div class="div-line"></div>
     </div>
 
-    <!-- Logo -->
+    <!-- Logo SVG embebido -->
     <div class="logo-wrap">
-      <img class="logo-img"
-           src="../assets/logo-mundial.png"
-           alt="Doblez — Edición Mundial 2026"
-           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="logo-fallback">
-        <span style="font-size:32px">⭐⭐⭐</span>
-        <span style="font-family:'Cinzel',serif;font-size:18px;color:#d4a328;letter-spacing:.14em">DOBLEZ</span>
-        <span style="font-family:'EB Garamond',serif;font-style:italic;font-size:12px;color:rgba(240,234,214,.6);margin-top:2px">Mundial 2026</span>
-      </div>
+      <svg width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="bgGrad" cx="45%" cy="38%" r="60%">
+            <stop offset="0%"   stop-color="#f7f2e4"/>
+            <stop offset="100%" stop-color="#ede4cc"/>
+          </radialGradient>
+          <radialGradient id="goldRing" cx="50%" cy="50%" r="50%">
+            <stop offset="75%"  stop-color="#b8882a"/>
+            <stop offset="88%"  stop-color="#e8c060"/>
+            <stop offset="100%" stop-color="#c49a30"/>
+          </radialGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Outer gold ring -->
+        <circle cx="110" cy="110" r="108" fill="url(#goldRing)"/>
+        <!-- Inner cream face -->
+        <circle cx="110" cy="110" r="96"  fill="url(#bgGrad)"/>
+
+        <!-- Decorative inner ring line -->
+        <circle cx="110" cy="110" r="92"  fill="none" stroke="#c49a30" stroke-width=".8" stroke-opacity=".5"/>
+
+        <!-- Sun of May (top center) -->
+        <g transform="translate(110,30)" filter="url(#glow)">
+          <circle r="9" fill="#d4a328"/>
+          <!-- Sun rays -->
+          <g stroke="#d4a328" stroke-width="2" stroke-linecap="round">
+            <line x1="0" y1="-14" x2="0" y2="-18"/>
+            <line x1="0" y1="14"  x2="0" y2="18"/>
+            <line x1="-14" y1="0" x2="-18" y2="0"/>
+            <line x1="14"  y1="0" x2="18"  y2="0"/>
+            <line x1="-10" y1="-10" x2="-13" y2="-13"/>
+            <line x1="10"  y1="-10" x2="13"  y2="-13"/>
+            <line x1="-10" y1="10"  x2="-13" y2="13"/>
+            <line x1="10"  y1="10"  x2="13"  y2="13"/>
+          </g>
+          <!-- Sun face -->
+          <circle r="3" fill="#b8882a" cx="-3" cy="-1"/>
+          <circle r="3" fill="#b8882a" cx="3"  cy="-1"/>
+          <path d="M-3,3 Q0,6 3,3" stroke="#b8882a" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        </g>
+
+        <!-- Three stars -->
+        <g fill="#d4a328" filter="url(#glow)">
+          <!-- Left star -->
+          <polygon points="88,58 89.8,63.5 95.5,63.5 91,67 92.8,72.5 88,69 83.2,72.5 85,67 80.5,63.5 86.2,63.5" transform="scale(.62) translate(52,30)"/>
+          <!-- Center star -->
+          <polygon points="110,53 112,59 118,59 113.2,62.8 115.2,68.8 110,65 104.8,68.8 106.8,62.8 102,59 108,59" transform="scale(.7) translate(0,0)"/>
+          <!-- Right star -->
+          <polygon points="132,58 133.8,63.5 139.5,63.5 135,67 136.8,72.5 132,69 127.2,72.5 129,67 124.5,63.5 130.2,63.5" transform="scale(.62) translate(-52,30)"/>
+        </g>
+
+        <!-- Gold baroque flourishes top -->
+        <g fill="none" stroke="#c49a30" stroke-width="1.6" stroke-linecap="round" opacity=".85">
+          <!-- Left flourish -->
+          <path d="M38,72 C30,58 48,48 58,62 C64,70 56,80 48,76"/>
+          <path d="M48,76 C42,72 44,64 52,66"/>
+          <path d="M38,72 C34,80 42,90 50,84"/>
+          <!-- Right flourish (mirror) -->
+          <path d="M182,72 C190,58 172,48 162,62 C156,70 164,80 172,76"/>
+          <path d="M172,76 C178,72 176,64 168,66"/>
+          <path d="M182,72 C186,80 178,90 170,84"/>
+        </g>
+
+        <!-- Green leaf accents -->
+        <g fill="#4a7a4a" opacity=".8">
+          <ellipse cx="52"  cy="95"  rx="8"  ry="4"  transform="rotate(-35,52,95)"/>
+          <ellipse cx="44"  cy="108" rx="7"  ry="3.5" transform="rotate(-15,44,108)"/>
+          <ellipse cx="168" cy="95"  rx="8"  ry="4"  transform="rotate(35,168,95)"/>
+          <ellipse cx="176" cy="108" rx="7"  ry="3.5" transform="rotate(15,176,108)"/>
+        </g>
+
+        <!-- Argentine flag ribbon (left side) -->
+        <g transform="translate(34,115)">
+          <rect x="0"  y="0" width="22" height="6" rx="1" fill="#74acdf"/>
+          <rect x="0"  y="6" width="22" height="6" rx="1" fill="#f0f0f0"/>
+          <rect x="0" y="12" width="22" height="6" rx="1" fill="#74acdf"/>
+          <!-- ribbon tail -->
+          <path d="M22,0 L30,9 L22,18" fill="#4a8cbf" opacity=".6"/>
+        </g>
+
+        <!-- "Doblez" script text — main -->
+        <text x="110" y="148"
+              font-family="'Dancing Script', cursive"
+              font-size="46"
+              font-weight="700"
+              text-anchor="middle"
+              fill="#1a7a7a"
+              filter="url(#glow)"
+              letter-spacing="-1">Doblez</text>
+
+        <!-- Separator line -->
+        <line x1="60" y1="158" x2="160" y2="158" stroke="#c49a30" stroke-width=".8" opacity=".5"/>
+
+        <!-- Bottom text: Sabor -->
+        <text x="90" y="172" font-family="'EB Garamond', Georgia, serif" font-size="11"
+              font-style="italic" fill="#1a5a5a" text-anchor="middle" letter-spacing=".5">Sabor:</text>
+        <line x1="100" y1="172" x2="152" y2="172" stroke="#1a7a7a" stroke-width=".9" opacity=".6"/>
+
+        <!-- Bottom curved text -->
+        <path id="arcBot" d="M 32,130 A 80,80 0 0 0 188,130" fill="none"/>
+        <text font-family="'Cinzel', serif" font-size="8.5" fill="#1a6a6a" letter-spacing=".8">
+          <textPath href="#arcBot" startOffset="8%">Edición Especial del Mundial 2026</textPath>
+        </text>
+
+        <!-- Gold bottom flourish -->
+        <g fill="none" stroke="#c49a30" stroke-width="1.4" stroke-linecap="round" opacity=".7">
+          <path d="M75,185 C80,178 90,182 95,178 C100,174 105,176 110,174"/>
+          <path d="M145,185 C140,178 130,182 125,178 C120,174 115,176 110,174"/>
+        </g>
+      </svg>
     </div>
 
     <div class="edition-badge">✦&nbsp;&nbsp;Edición Especial del Mundial 2026&nbsp;&nbsp;✦</div>
