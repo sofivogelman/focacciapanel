@@ -25,6 +25,15 @@ const ProductionModule = (() => {
     return Store.masaLog.all().reduce((s, l) => s + (l.grams || 0), 0);
   }
 
+  // Fecha local del registro más antiguo en masaLog (YYYY-MM-DD), o null si no hay registros
+  function getTrackingStart() {
+    const logs = Store.masaLog.all();
+    if (!logs.length) return null;
+    const earliest = logs.reduce((min, l) => Math.min(min, l.createdAt || 0), Infinity);
+    const d = new Date(earliest);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
   // ─── Gramos de masa para un conjunto de pedidos ───────────────────────────────
   function masaDeOrders(orders) {
     let g = 0;
@@ -78,8 +87,11 @@ const ProductionModule = (() => {
 
   // ─── Render principal ─────────────────────────────────────────────────────────
   function render(container) {
-    const masaTotal        = getMasaTotal();
-    const masaConsumida    = masaDeOrders(Store.orders.where(o => o.status === 'entregado'));
+    const masaTotal     = getMasaTotal();
+    const trackingStart = getTrackingStart();
+    const masaConsumida = trackingStart
+      ? masaDeOrders(Store.orders.where(o => o.status === 'entregado' && (o.deliveryDate || o.date || '') >= trackingStart))
+      : 0;
     const masaComprometida = masaDeOrders(Store.orders.where(o => o.status !== 'cancelado' && o.status !== 'entregado'));
     const masaEnStock      = masaTotal - masaConsumida;   // lo que físicamente queda
     const masaLibre        = masaEnStock - masaComprometida; // libre para nuevos pedidos
