@@ -112,10 +112,16 @@ const ProductionModule = (() => {
             <h1 class="page-title">Producción</h1>
             <p class="page-subtitle">Stock de masa · bolsas de 1kg harina</p>
           </div>
-          <button class="btn btn-primary" onclick="ProductionModule.openMasaModal()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-            Registrar masa hecha
-          </button>
+          <div style="display:flex;gap:var(--space-2)">
+            <button class="btn btn-secondary" onclick="ProductionModule.openAjusteModal()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Ajustar stock
+            </button>
+            <button class="btn btn-primary" onclick="ProductionModule.openMasaModal()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+              Registrar masa hecha
+            </button>
+          </div>
         </div>
 
         <!-- Resumen stock -->
@@ -310,11 +316,54 @@ const ProductionModule = (() => {
     render(document.getElementById('pageContent'));
   }
 
+  // ─── Modal: ajuste manual de stock ───────────────────────────────────────────
+  function openAjusteModal() {
+    const masaTotal     = getMasaTotal();
+    const trackingStart = getTrackingStart();
+    const masaConsumida = trackingStart
+      ? masaDeOrders(Store.orders.where(o => o.status === 'entregado' && (o.deliveryDate || o.date || '') >= trackingStart))
+      : 0;
+    const masaEnStock = masaTotal - masaConsumida;
+    const stockActualBolsas = masaEnStock > 0 ? (masaEnStock / MASA_POR_BOLSA).toFixed(1) : '0';
+
+    App.openModal({
+      title: 'Ajustar stock de masa',
+      body: `
+        <div class="form-group">
+          <div style="background:var(--color-bg);border-radius:var(--radius-sm);padding:var(--space-3);margin-bottom:var(--space-3);font-size:var(--text-sm);color:var(--color-text-secondary)">
+            Stock calculado actualmente: <strong>${stockActualBolsas} bolsas</strong>
+          </div>
+          <label class="form-label">¿Cuántas bolsas de harina tenés físicamente ahora?</label>
+          <input class="form-input" id="fAjusteBolsas" type="number" min="0" step="0.5" value="${stockActualBolsas}"
+            style="font-size:var(--text-xl);text-align:center;height:52px" />
+          <div class="form-hint">1 bolsa = ${HARINA_POR_BOLSA}g harina → ${MASA_POR_BOLSA}g masa. Se agrega una corrección al historial.</div>
+        </div>
+      `,
+      primaryLabel: 'Guardar',
+      onConfirm: () => {
+        const nuevasBolsas = parseFloat(document.getElementById('fAjusteBolsas').value);
+        if (isNaN(nuevasBolsas) || nuevasBolsas < 0) { App.toast('error', 'Ingresá una cantidad válida'); return false; }
+        const nuevoGrams  = Math.round(nuevasBolsas * MASA_POR_BOLSA);
+        const corrGrams   = nuevoGrams - masaEnStock;
+        if (corrGrams === 0) { App.toast('success', 'Sin cambios necesarios'); return true; }
+        Store.masaLog.create({
+          bolsas: corrGrams / MASA_POR_BOLSA,
+          grams:  corrGrams,
+          notes:  'Ajuste manual de stock',
+          createdAt: Date.now(),
+        });
+        App.toast('success', 'Stock ajustado a ' + nuevasBolsas + ' bolsas');
+        render(document.getElementById('pageContent'));
+        return true;
+      },
+    });
+  }
+
   function marcarEntregado(id) {
     Store.orders.update(id, { status: 'entregado' });
     App.toast('success', 'Pedido marcado como entregado');
     render(document.getElementById('pageContent'));
   }
 
-  return { render, openMasaModal, removeLog, clearAllMasa, marcarEntregado, openCreateModal: openMasaModal };
+  return { render, openMasaModal, openAjusteModal, removeLog, clearAllMasa, marcarEntregado, openCreateModal: openMasaModal };
 })();
