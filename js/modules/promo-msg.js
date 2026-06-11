@@ -1,95 +1,26 @@
 const PromoMsgModule = (() => {
 
-  const FLAVOR_EMOJI = {
-    romero: '🌿', papa: '🧀', parmesano: '🧀', mozzarella: '🧀', queso: '🧀',
-    tomate: '🍅', cherry: '🍅', pesto: '🌱', aceitun: '🫒', cebolla: '🧅',
-    ajo: '🧄', hongo: '🍄', champinon: '🍄', jamon: '🍖', jamón: '🍖',
-    rúcula: '🥬', rucula: '🥬', espinaca: '🥬', albahaca: '🌿', oregano: '🌿',
-    oregán: '🌿', brie: '🧀', cream: '🧀', dulce: '🍯',
-  };
-
-  function flavorEmoji(name) {
-    const n = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-    for (const [key, emoji] of Object.entries(FLAVOR_EMOJI)) {
-      const normKey = key.normalize('NFD').replace(/[̀-ͯ]/g, '');
-      if (n.includes(normKey)) return emoji;
-    }
-    return '🍞';
-  }
-
-  function fmtPrice(p) {
-    return '$' + Number(p).toLocaleString('es-AR');
-  }
-
-  function getCurrentWeekStart() {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    d.setDate(d.getDate() + diff);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dd}`;
-  }
-
-  function getCurrentPromo() {
-    const weekStart = getCurrentWeekStart();
-    return Store.promos.where(p => p.active && p.semana === weekStart)[0] || null;
-  }
-
-  function buildPromoDesc(promo) {
-    if (promo.notes) return promo.notes;
-    if (promo.items && promo.items.length) {
-      const parts = promo.items.map(i => `${i.qty || 1} ${i.format}`).join(' + ');
-      return `${parts} por ${fmtPrice(promo.price)}`;
-    }
-    return `${promo.name} por ${fmtPrice(promo.price)}`;
-  }
-
-  function buildMessage(promo) {
-    const formats = Store.formats.where(f => f.active !== false);
-    const flavors = Store.flavors.all();
-    const lines = [];
-
-    lines.push('🌿 Focaccias Artesanales 🌿');
-    lines.push(' ');
-
-    if (promo) {
-      lines.push(`PROMO DE LA SEMANA - ${promo.name}:`);
-      lines.push('');
-      lines.push(buildPromoDesc(promo));
-      lines.push('');
-      lines.push('✨✨Pedi la tuya ✨✨');
-      lines.push('');
-    }
-
-    lines.push('');
-    lines.push('Formatos y Precios :');
-    formats.forEach(f => lines.push(`* ${f.name}: ${fmtPrice(f.price)}`));
-
-    lines.push('');
-    lines.push('Sabores disponibles :');
-    flavors.forEach(f => lines.push(` ${flavorEmoji(f.name)} ${f.name}`));
-
-    lines.push('');
-    lines.push('¿Cómo hacer tu pedido?');
-    lines.push('💻 Formulario web: https://tinyurl.com/pedi-tu-focaccia');
-    lines.push('📲 Mensaje directo: wa.me/5491122339340');
-    lines.push('');
-    lines.push('Recordá hacer el pedido con al menos 24 hrs de anticipación');
-    lines.push('');
-    lines.push('📍 Entregas a coordinar en Zona Norte (Bancalari, Villanueva, Nordelta y alrededores)');
-    lines.push('');
-    lines.push('💳 Aceptamos transferencia o efectivo.');
-
-    return lines.join('\n');
+  function buildMessage() {
+    return [
+      '🌿 DOBLEZ — Focacceria Artesanal 🌿',
+      '',
+      '¿Cómo hacer tu pedido?',
+      '💻 Formulario web: https://tinyurl.com/pedi-tu-focaccia',
+      '📲 WhatsApp: wa.me/5491122339340',
+      '',
+      '⚠️ LOS PEDIDOS SE HACEN CON MÍNIMO 24 HS DE ANTICIPACIÓN ⚠️',
+      '',
+      '📍 Entregas en Zona Norte',
+      '   Bancalari, Villanueva, Nordelta y alrededores',
+      '',
+      '💳 Aceptamos transferencia o efectivo.',
+    ].join('\n');
   }
 
   function regenerate() {
-    const promo = getCurrentPromo();
     const ta = document.getElementById('promoMsgText');
-    if (ta) ta.value = buildMessage(promo);
-    App.toast('success', 'Mensaje actualizado desde los datos actuales');
+    if (ta) ta.value = buildMessage();
+    App.toast('success', 'Mensaje actualizado');
   }
 
   async function copyMsg() {
@@ -105,21 +36,12 @@ const PromoMsgModule = (() => {
   }
 
   function render(container) {
-    const promo    = getCurrentPromo();
-    const msgText  = buildMessage(promo);
-    const promoTag = promo
-      ? `<span style="background:var(--color-primary-subtle);color:var(--color-primary-dark);font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full);font-weight:500">Promo: ${promo.name}</span>`
-      : `<span style="background:var(--color-surface-alt);color:var(--color-text-muted);font-size:var(--text-xs);padding:2px 8px;border-radius:var(--radius-full)">Sin promo esta semana</span>`;
-
     container.innerHTML = `
       <div class="fade-in">
         <div class="page-header d-flex items-center justify-between" style="flex-wrap:wrap;gap:var(--space-3)">
           <div>
             <h1 class="page-title">Mensaje WhatsApp</h1>
-            <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2)">
-              <p class="page-subtitle" style="margin:0">Generado desde los datos actuales</p>
-              ${promoTag}
-            </div>
+            <p class="page-subtitle" style="margin:0">Listo para copiar y pegar</p>
           </div>
           <div style="display:flex;gap:var(--space-2);flex-shrink:0">
             <button class="btn btn-secondary btn-sm" onclick="PromoMsgModule.regenerate()">
@@ -145,15 +67,14 @@ const PromoMsgModule = (() => {
           <textarea
             id="promoMsgText"
             class="form-textarea"
-            style="font-family:monospace;font-size:var(--text-sm);min-height:500px;line-height:1.7;resize:vertical;border-radius:var(--radius-sm)"
+            style="font-family:monospace;font-size:var(--text-sm);min-height:260px;line-height:1.7;resize:vertical;border-radius:var(--radius-sm)"
             spellcheck="false"
           ></textarea>
         </div>
       </div>
     `;
 
-    // Set value after DOM insertion to avoid HTML-entity issues
-    document.getElementById('promoMsgText').value = msgText;
+    document.getElementById('promoMsgText').value = buildMessage();
   }
 
   return { render, regenerate, copyMsg };
