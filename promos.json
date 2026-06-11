@@ -1,57 +1,89 @@
 {
-  "updated": "2026-06-11",
-  "promos": [
-    {
-      "id": 1,
-      "name": "Familiar + Individual Clásica de regalo",
-      "tipo": "Familiar + Individual Clásica de regalo",
-      "price": 12000,
-      "semana": "2026-05-26",
-      "items": [
-        {
-          "format": "Familiar",
-          "qty": 1
-        },
-        {
-          "format": "Individual",
-          "qty": 1
-        }
-      ],
-      "notes": "",
-      "active": false,
-      "esFormato": false
-    },
-    {
-      "id": 2,
-      "name": "Promo25 (Promo (25 de Mayo)",
-      "tipo": "2 familiares",
-      "price": 21000,
-      "semana": "2026-05-21",
-      "items": [
-        {
-          "format": "Familiar",
-          "qty": 2
-        }
-      ],
-      "notes": "",
-      "active": false,
-      "esFormato": false
-    },
-    {
-      "id": 3,
-      "name": "Amalfi — 17×13 cm",
-      "tipo": "Amalfi — 17×13 cm",
-      "price": 7000,
-      "semana": "2026-06-08",
-      "items": [
-        {
-          "format": "Amalfi — 17×13 cm",
-          "qty": 1
-        }
-      ],
-      "notes": "Esta semana, la Amalfi (17×13 cm) a precio especial — solo $7.000",
-      "active": true,
-      "esFormato": false
-    }
-  ]
+    "promos":  [
+                   {
+                       "tipo":  "Familiar + Individual Clásica de regalo",
+                       "id":  1,
+                       "esFormato":  false,
+                       "price":  12000,
+                       "semana":  "2026-05-26",
+                       "items":  [
+                                     {
+                                         "qty":  1,
+                                         "format":  "Familiar"
+                                     },
+                                     {
+                                         "qty":  1,
+                                         "format":  "Individual"
+                                     }
+                                 ],
+                       "name":  "Familiar + Individual Clásica de regalo",
+                       "active":  false,
+                       "notes":  ""
+                   },
+                   {
+                       "tipo":  "2 familiares",
+                       "id":  2,
+                       "esFormato":  false,
+                       "price":  21000,
+                       "semana":  "2026-05-21",
+                       "items":  [
+                                     {
+                                         "qty":  2,
+                                         "format":  "Familiar"
+                                     }
+                                 ],
+                       "name":  "Promo25 (Promo (25 de Mayo)",
+                       "active":  false,
+                       "notes":  ""
+                   },
+                   {
+                       "tipo":  "Amalfi — 17×13 cm",
+                       "id":  3,
+                       "esFormato":  false,
+                       "price":  7000,
+                       "semana":  "2026-06-08",
+                       "items":  [
+                                     {
+                                         "qty":  1,
+                                         "format":  "Amalfi — 17×13 cm"
+                                     }
+                                 ],
+                       "name":  "Amalfi — 17×13 cm",
+                       "active":  false,
+                       "notes":  "Esta semana, la Amalfi (17×13 cm) a precio especial — solo $7.000"
+                   },
+                   {
+                       "tipo":  "Combo Mundialista",
+                       "id":  4,
+                       "esFormato":  true,
+                       "price":  30000,
+                       "semana":  "",
+                       "items":  [
+                                     {
+                                         "qty":  2,
+                                         "format":  "Enzo"
+                                     }
+                                 ],
+                       "name":  "Box Mundialista ⚽",
+                       "active":  true,
+                       "notes":  "Para dos. Dos focaccias Enzo a tu elección, una picada para compartir y un Malbec."
+                   },
+                   {
+                       "tipo":  "Combo Mundialista",
+                       "id":  5,
+                       "esFormato":  true,
+                       "price":  20000,
+                       "semana":  "",
+                       "items":  [
+                                     {
+                                         "qty":  1,
+                                         "format":  "Messi"
+                                     }
+                                 ],
+                       "name":  "La Previa 🍷",
+                       "active":  true,
+                       "notes":  "Una Messi artesanal a tu elección y un Malbec. Edición especial Mundial 2026."
+                   }
+               ],
+    "updated":  "2026-06-11"
 }
