@@ -14,9 +14,9 @@ const ProductionModule = (() => {
     const stored = Store.formats.where(f => f.name === formatName)[0];
     if (stored?.grams) return stored.grams;
     const n = (formatName || '').toLowerCase();
-    if (n.includes('puglia') || n.includes('familiar')) return MASA_G.grande;
-    if (n.includes('amalfi') || n.includes('17'))       return MASA_G.mediana;
-    if (n.includes('capri')  || n.includes('individual')) return MASA_G.chica;
+    if (n.includes('puglia') || n.includes('familiar') || n.includes('messi')) return MASA_G.grande;
+    if (n.includes('amalfi') || n.includes('17')       || n.includes('dibu'))  return MASA_G.mediana;
+    if (n.includes('capri')  || n.includes('individual') || n.includes('enzo')) return MASA_G.chica;
     return 0;
   }
 
@@ -42,7 +42,7 @@ const ProductionModule = (() => {
         const qty = item.qty || 1;
         g += qty * getMasaGrams(item.format);
         const n = (item.format || '').toLowerCase();
-        if ((n.includes('puglia') || n.includes('familiar')) && tieneRegalo(item.flavor)) {
+        if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
           g += qty * MASA_G.chica;
         }
       });
@@ -64,7 +64,7 @@ const ProductionModule = (() => {
         const qty = item.qty || 1;
         byDate[date].grams += qty * getMasaGrams(item.format);
         const n = (item.format || '').toLowerCase();
-        if ((n.includes('puglia') || n.includes('familiar')) && tieneRegalo(item.flavor)) {
+        if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
           byDate[date].grams += qty * MASA_G.chica;
         }
       });
