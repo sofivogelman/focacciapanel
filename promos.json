@@ -1,5 +1,5 @@
 {
-  "updated": "2026-06-02",
+  "updated": "2026-06-11",
   "promos": [
     {
       "id": 1,
@@ -39,19 +39,19 @@
     },
     {
       "id": 3,
-      "name": "Promo Degustación",
-      "tipo": "4 individuales",
-      "price": 16000,
-      "semana": "2026-06-02",
+      "name": "Amalfi — 17×13 cm",
+      "tipo": "Amalfi — 17×13 cm",
+      "price": 7000,
+      "semana": "2026-06-08",
       "items": [
         {
-          "format": "Individual",
-          "qty": 4
+          "format": "Amalfi — 17×13 cm",
+          "qty": 1
         }
       ],
-      "notes": "",
+      "notes": "Esta semana, la Amalfi (17×13 cm) a precio especial — solo $7.000",
       "active": true,
-      "esFormato": true
+      "esFormato": false
     }
   ]
 }
