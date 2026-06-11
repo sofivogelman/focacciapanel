@@ -332,7 +332,7 @@ const ConfigModule = (() => {
               <tbody>
                 ${items.map(p => `
                   <tr>
-                    <td class="text-sm td-hide-mobile" style="color:var(--color-text-muted);white-space:nowrap">${p.semana ? fmtWeek(p.semana) : '—'}</td>
+                    <td class="text-sm td-hide-mobile" style="color:var(--color-text-muted);white-space:nowrap">${p.semana ? (() => { try { return new Date(p.semana + 'T12:00:00').toLocaleDateString('es-AR', { day:'numeric', month:'short' }); } catch { return p.semana; } })() : 'Sin fecha'}</td>
                     <td class="font-medium">
                       ${escHtml(p.name)}
                       ${p.esFormato ? '<span class="badge badge-info" style="margin-left:4px;font-size:10px">Formato</span>' : ''}
