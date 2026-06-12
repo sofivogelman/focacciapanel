@@ -1,38 +1,39 @@
 :root {
-  /* Colors */
-  --color-primary: #6B7C52;
-  --color-primary-dark: #4E5C3A;
-  --color-primary-light: #8A9A6A;
-  --color-primary-muted: #B5C49E;
-  --color-primary-subtle: #E8EDE0;
+  /* Colors — Crema + Teal + Dorado */
+  --color-primary: #1A7A8C;
+  --color-primary-dark: #145F6E;
+  --color-primary-light: #2A9BAF;
+  --color-primary-muted: #7DBFCC;
+  --color-primary-subtle: #E0F0F4;
 
-  --color-bg: #F6F3EE;
-  --color-surface: #FDFCF9;
-  --color-surface-alt: #F0EDE6;
+  --color-bg: #F5F0E8;
+  --color-surface: #FDFAF5;
+  --color-surface-alt: #EDE8DC;
 
-  --color-border: #DDD9D0;
-  --color-border-light: #EBE7DF;
+  --color-border: #D6C9B0;
+  --color-border-light: #E8E0D0;
 
-  --color-text: #2A2A25;
-  --color-text-secondary: #6B6860;
-  --color-text-muted: #9B9890;
+  --color-text: #1A2A32;
+  --color-text-secondary: #5A6870;
+  --color-text-muted: #9A9490;
 
-  --color-accent: #A67C52;
-  --color-accent-light: #C4A07A;
-  --color-accent-subtle: #F2E9DF;
+  --color-accent: #C4921F;
+  --color-accent-light: #D4AA45;
+  --color-accent-subtle: #F7EDDA;
 
-  --color-success: #5C7A52;
-  --color-warning: #A08040;
-  --color-danger: #8A4A42;
-  --color-info: #4A6B7A;
+  --color-success: #4A7A5A;
+  --color-warning: #B07830;
+  --color-danger: #8A3A32;
+  --color-info: #2A6A7A;
 
-  --color-success-bg: #EDF3EA;
-  --color-warning-bg: #F5F0E0;
-  --color-danger-bg: #F5ECEB;
-  --color-info-bg: #E8EFF3;
+  --color-success-bg: #EAF3EC;
+  --color-warning-bg: #F5EDD8;
+  --color-danger-bg: #F5E8E6;
+  --color-info-bg: #E2EFF3;
 
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   --text-xs: 0.75rem;
