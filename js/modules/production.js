@@ -20,6 +20,16 @@ const ProductionModule = (() => {
     return 0;
   }
 
+  // Gramos para un ítem de pedido — maneja formatos normales Y promos
+  function getMasaParaItem(formatName) {
+    const base = getMasaGrams(formatName);
+    if (base) return base;
+    const promo = Store.promos.where(p => p.name === formatName)[0];
+    if (!promo) return 0;
+    if (promo.grams) return promo.grams;
+    return (promo.items || []).reduce((s, pi) => s + getMasaGrams(pi.format) * (pi.qty || 1), 0);
+  }
+
   // ─── Masa total acumulada en el log ──────────────────────────────────────────
   function getMasaTotal() {
     return Store.masaLog.all().reduce((s, l) => s + (l.grams || 0), 0);
@@ -40,7 +50,7 @@ const ProductionModule = (() => {
     orders.forEach(o => {
       (o.items || []).forEach(item => {
         const qty = item.qty || 1;
-        g += qty * getMasaGrams(item.format);
+        g += qty * getMasaParaItem(item.format);
         const n = (item.format || '').toLowerCase();
         if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
           g += qty * MASA_G.chica;
@@ -62,7 +72,7 @@ const ProductionModule = (() => {
       byDate[date].pedidos.push(order);
       (order.items || []).forEach(item => {
         const qty = item.qty || 1;
-        byDate[date].grams += qty * getMasaGrams(item.format);
+        byDate[date].grams += qty * getMasaParaItem(item.format);
         const n = (item.format || '').toLowerCase();
         if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
           byDate[date].grams += qty * MASA_G.chica;
