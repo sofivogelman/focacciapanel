@@ -33,12 +33,21 @@ const DashboardModule = (() => {
       return 0;
     }
 
+    function getMasaParaItem(formatName) {
+      const base = getMasaGrams(formatName);
+      if (base) return base;
+      const promo = Store.promos.where(p => p.name === formatName)[0];
+      if (!promo) return 0;
+      if (promo.grams) return promo.grams;
+      return (promo.items || []).reduce((s, pi) => s + getMasaGrams(pi.format) * (pi.qty || 1), 0);
+    }
+
     function masaDeOrders(orders) {
       let g = 0;
       orders.forEach(o => {
         (o.items || []).forEach(item => {
           const qty = item.qty || 1;
-          g += qty * getMasaGrams(item.format);
+          g += qty * getMasaParaItem(item.format);
           const n = (item.format || '').toLowerCase();
           if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
             g += qty * MASA_G.chica;
