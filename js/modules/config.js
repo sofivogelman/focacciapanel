@@ -213,12 +213,13 @@ const ConfigModule = (() => {
         ${items.length === 0
           ? `<p class="text-sm text-center" style="color:var(--color-text-muted);padding:var(--space-6) 0">Sin formatos cargados todavía.</p>`
           : `<div style="overflow-x:auto"><table class="table">
-              <thead><tr><th>Nombre</th><th>Precio</th><th>Estado</th><th></th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Precio</th><th>Masa</th><th>Estado</th><th></th></tr></thead>
               <tbody>
                 ${items.map(f => `
                   <tr>
                     <td class="font-medium">${escHtml(f.name)}</td>
                     <td class="text-sm">${f.price ? '$' + Number(f.price).toLocaleString('es-AR') : '<span style="color:var(--color-text-muted)">—</span>'}</td>
+                    <td class="text-sm">${f.grams ? f.grams + 'g' : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                     <td><span class="badge ${f.active ? 'badge-success' : 'badge-default'}">${f.active ? 'Activo' : 'Inactivo'}</span></td>
                     <td class="cfg-actions">
                       <button class="btn btn-xs btn-ghost" onclick="ConfigModule.editFormat(${f.id})">Editar</button>
@@ -249,6 +250,14 @@ const ConfigModule = (() => {
             value="${f?.price || ''}" placeholder="ej: 3500" />
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Gramos de masa (g)</label>
+          <input class="form-input" id="fFormatGrams" type="number" min="0"
+            value="${f?.grams || ''}" placeholder="ej: 280" />
+          <div class="form-hint">Cantidad de masa necesaria para este tamaño.</div>
+        </div>
+      </div>
     `;
   }
 
@@ -260,8 +269,9 @@ const ConfigModule = (() => {
       onConfirm: () => {
         const name  = document.getElementById('fFormatName').value.trim();
         const price = parseFloat(document.getElementById('fFormatPrice').value) || 0;
+        const grams = parseFloat(document.getElementById('fFormatGrams').value) || 0;
         if (!name) { App.toast('error', 'Ingresá el nombre del formato'); return false; }
-        Store.formats.create({ name, price, active: true });
+        Store.formats.create({ name, price, grams, active: true });
         renderFormats();
         return true;
       },
@@ -278,8 +288,9 @@ const ConfigModule = (() => {
       onConfirm: () => {
         const name  = document.getElementById('fFormatName').value.trim();
         const price = parseFloat(document.getElementById('fFormatPrice').value) || 0;
+        const grams = parseFloat(document.getElementById('fFormatGrams').value) || 0;
         if (!name) return false;
-        Store.formats.update(id, { name, price });
+        Store.formats.update(id, { name, price, grams });
         renderFormats();
         return true;
       },
