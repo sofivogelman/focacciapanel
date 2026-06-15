@@ -428,6 +428,12 @@ const ConfigModule = (() => {
           <input class="form-input" id="fPromoPrice" type="number" min="0"
             value="${p?.price || ''}" placeholder="ej: 4000" />
         </div>
+        <div class="form-group">
+          <label class="form-label">Gramos de masa (g)</label>
+          <input class="form-input" id="fPromoGrams" type="number" min="0"
+            value="${p?.grams || ''}" placeholder="ej: 560" />
+          <div class="form-hint">Si lo dejás vacío se calcula desde los formatos del combo.</div>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">Descripción <span style="color:var(--color-text-muted);font-weight:400">(aparece en la página de pedidos si está marcada como formato)</span></label>
@@ -482,7 +488,8 @@ const ConfigModule = (() => {
         const items     = readPromoItems();
         const notes     = (document.getElementById('fPromoNotes')?.value || '').trim();
         const esFormato = document.getElementById('fPromoEsFormato')?.checked || false;
-        Store.promos.create({ name, tipo, price, semana, items, notes, active: true, esFormato });
+        const grams     = parseFloat(document.getElementById('fPromoGrams')?.value) || 0;
+        Store.promos.create({ name, tipo, price, semana, grams, items, notes, active: true, esFormato });
         renderPromos();
         return true;
       },
@@ -506,7 +513,8 @@ const ConfigModule = (() => {
         const items     = readPromoItems();
         const notes     = (document.getElementById('fPromoNotes')?.value || '').trim();
         const esFormato = document.getElementById('fPromoEsFormato')?.checked || false;
-        Store.promos.update(id, { name, tipo, price, semana, items, notes, esFormato });
+        const grams     = parseFloat(document.getElementById('fPromoGrams')?.value) || 0;
+        Store.promos.update(id, { name, tipo, price, semana, grams, items, notes, esFormato });
         renderPromos();
         return true;
       },
