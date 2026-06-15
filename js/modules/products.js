@@ -42,6 +42,7 @@ const ProductsModule = (() => {
             <div class="d-flex items-center gap-3" style="margin-bottom:var(--space-3)">
               <span class="font-semibold">${format.name}</span>
               ${format.price ? `<span class="badge badge-primary">${fmt(format.price)}</span>` : ''}
+              ${format.grams ? `<span class="badge badge-default" style="color:var(--color-text-secondary)">${format.grams}g masa</span>` : ''}
               <div class="divider" style="flex:1;margin:0"></div>
             </div>
             <div class="card card-sm">
