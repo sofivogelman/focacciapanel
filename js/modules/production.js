@@ -4,6 +4,15 @@ const ProductionModule = (() => {
   const MASA_POR_BOLSA   = 1910;
   const HARINA_POR_BOLSA = 1000;
 
+  const _PROMOS_JSON = 'https://raw.githubusercontent.com/sofivogelman/focacciapanel/main/promos.json';
+  let   _promosCache = [];
+  (async () => {
+    try {
+      const d = await fetch(_PROMOS_JSON + '?t=' + Date.now()).then(r => r.json());
+      _promosCache = (d.promos || []).filter(p => p.active);
+    } catch(e) {}
+  })();
+
   function tieneRegalo(flavor) {
     const f = (flavor || '').toLowerCase();
     return f.includes('regalo') && !f.includes('sin individual') && !f.includes('romero');
@@ -24,7 +33,8 @@ const ProductionModule = (() => {
   function getMasaParaItem(formatName) {
     const base = getMasaGrams(formatName);
     if (base) return base;
-    const promo = Store.promos.where(p => p.name === formatName)[0];
+    const promo = Store.promos.where(p => p.name === formatName)[0]
+               || _promosCache.find(p => p.name === formatName);
     if (!promo) return 0;
     if (promo.grams) return promo.grams;
     return (promo.items || []).reduce((s, pi) => s + getMasaGrams(pi.format) * (pi.qty || 1), 0);
