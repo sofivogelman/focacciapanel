@@ -14,6 +14,15 @@ const DashboardModule = (() => {
   function fmt(n) { return '$' + n.toLocaleString('es-AR'); }
 
   // ─── Recordatorio de masa (modelo pool) ──────────────────────────────────────
+  const _PROMOS_JSON_URL = 'https://raw.githubusercontent.com/sofivogelman/focacciapanel/main/promos.json';
+  let   _promosCache = [];
+  (async () => {
+    try {
+      const d = await fetch(_PROMOS_JSON_URL + '?t=' + Date.now()).then(r => r.json());
+      _promosCache = (d.promos || []).filter(p => p.active);
+    } catch(e) {}
+  })();
+
   function renderMasaReminder() {
     const MASA_G         = { grande: 900, mediana: 350, chica: 280 };
     const MASA_POR_BOLSA = 1910;
@@ -36,7 +45,8 @@ const DashboardModule = (() => {
     function getMasaParaItem(formatName) {
       const base = getMasaGrams(formatName);
       if (base) return base;
-      const promo = Store.promos.where(p => p.name === formatName)[0];
+      const promo = Store.promos.where(p => p.name === formatName)[0]
+                 || _promosCache.find(p => p.name === formatName);
       if (!promo) return 0;
       if (promo.grams) return promo.grams;
       return (promo.items || []).reduce((s, pi) => s + getMasaGrams(pi.format) * (pi.qty || 1), 0);
