@@ -54,13 +54,19 @@ const ProductionModule = (() => {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
+  // Devuelve el nombre de formato o promo a usar para el cálculo de masa
+  function resolveFormatKey(item) {
+    return (item.format || '').toLowerCase() === 'promo' ? (item.flavor || '') : (item.format || '');
+  }
+
   // ─── Gramos de masa para un conjunto de pedidos ───────────────────────────────
   function masaDeOrders(orders) {
     let g = 0;
     orders.forEach(o => {
       (o.items || []).forEach(item => {
         const qty = item.qty || 1;
-        g += qty * getMasaParaItem(item.format);
+        const key = resolveFormatKey(item);
+        g += qty * getMasaParaItem(key);
         const n = (item.format || '').toLowerCase();
         if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
           g += qty * MASA_G.chica;
@@ -82,7 +88,8 @@ const ProductionModule = (() => {
       byDate[date].pedidos.push(order);
       (order.items || []).forEach(item => {
         const qty = item.qty || 1;
-        byDate[date].grams += qty * getMasaParaItem(item.format);
+        const key = resolveFormatKey(item);
+        byDate[date].grams += qty * getMasaParaItem(key);
         const n = (item.format || '').toLowerCase();
         if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
           byDate[date].grams += qty * MASA_G.chica;
@@ -214,8 +221,11 @@ const ProductionModule = (() => {
       const masaO = masaDeOrders([o]);
       const [badgeCls, badgeLabel] = STATUS_LABEL[o.status] || ['badge-default', o.status];
       const itemsStr = (o.items || [])
-        .filter(i => ['familiar','individual'].includes((i.format||'').toLowerCase()))
-        .map(i => `${i.qty||1}× ${i.format}`)
+        .map(i => {
+          const key = resolveFormatKey(i);
+          const g   = getMasaParaItem(key);
+          return `${i.qty||1}× ${key || i.name || '?'} (${g * (i.qty||1)}g)`;
+        })
         .join(', ') || '—';
       const entrega = o.deliveryDate
         ? new Date(o.deliveryDate + 'T12:00:00').toLocaleDateString('es-AR', { day:'numeric', month:'short' })
