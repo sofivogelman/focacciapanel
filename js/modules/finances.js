@@ -186,10 +186,24 @@ const FinancesModule = (() => {
     if (!raw) return '';
     const s = String(raw).trim();
     if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-    if (!m) return '';
-    const year = m[3].length === 2 ? '20' + m[3] : m[3];
-    return `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    // DD/MM/YY o DD/MM/YYYY
+    const mSlash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (mSlash) {
+      const year = mSlash[3].length === 2 ? '20' + mSlash[3] : mSlash[3];
+      return `${year}-${mSlash[2].padStart(2, '0')}-${mSlash[1].padStart(2, '0')}`;
+    }
+    // DD-MMM o DD MMM (ej: "30-may", "11-jun")
+    const MESES = { ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12,
+                    jan:1,                              apr:4,            aug:8,            dec:12 };
+    const mDash = s.match(/^(\d{1,2})[-\s]([a-z]{3})/i);
+    if (mDash) {
+      const mon = MESES[mDash[2].toLowerCase()];
+      if (mon) {
+        const year = new Date().getFullYear();
+        return `${year}-${String(mon).padStart(2,'0')}-${mDash[1].padStart(2,'0')}`;
+      }
+    }
+    return '';
   }
 
   function importFromExcel() {
@@ -209,8 +223,11 @@ const FinancesModule = (() => {
           const rows = XLSX.utils.sheet_to_json(ws, { raw: true, cellDates: true });
           if (!rows.length) { App.toast('error', 'El archivo está vacío'); return; }
 
-          // Normaliza nombre de columna: minúsculas, sin BOM, sin caracteres especiales
-          const nk = k => String(k).replace(/^﻿/, '').toLowerCase().trim();
+          // Normaliza nombre de columna: minúsculas, sin BOM ni espacios invisibles
+          const nk = k => String(k)
+            .replace(/[​‌‍﻿ ]/g, '')
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .toLowerCase().trim();
           const colKeys = Object.keys(rows[0]);
           const findCol = (...names) => {
             for (const n of names) {
@@ -221,12 +238,13 @@ const FinancesModule = (() => {
           };
 
           const colFecha   = findCol('fecha');
-          const colTotal   = findCol('total');
-          const colProduct = findCol('producto', 'descripcion', 'detalle');
+          const colTotal   = findCol('total', 'monto', 'importe', 'precio');
+          const colProduct = findCol('producto', 'descripcion', 'detalle', 'descripci');
           const colCuotas  = findCol('cuota', 'contado');
 
           if (!colFecha || !colTotal) {
-            App.toast('error', `Columnas detectadas: ${colKeys.join(', ')} — falta "Fecha" o "Total"`);
+            const falta = [!colFecha && '"Fecha"', !colTotal && '"Monto/Total"'].filter(Boolean).join(' y ');
+            App.toast('error', `Columnas: ${colKeys.join(', ')} — falta ${falta}`);
             return;
           }
 
