@@ -336,6 +336,7 @@ const ConfigModule = (() => {
                   <th class="th-hide-mobile">Tipo</th>
                   <th class="th-hide-mobile">Contenido</th>
                   <th>Precio</th>
+                  <th class="th-hide-mobile">Masa</th>
                   <th>Estado</th>
                   <th></th>
                 </tr>
@@ -356,6 +357,7 @@ const ConfigModule = (() => {
                       }
                     </td>
                     <td class="text-sm">${p.price ? '$' + Number(p.price).toLocaleString('es-AR') : '<span style="color:var(--color-text-muted)">—</span>'}</td>
+                    <td class="text-sm td-hide-mobile">${p.grams ? p.grams + 'g' : '<span style="color:var(--color-text-muted)">—</span>'}</td>
                     <td><span class="badge ${p.active ? 'badge-success' : 'badge-default'}">${p.active ? 'Activa' : 'Inactiva'}</span></td>
                     <td class="cfg-actions">
                       <button class="btn btn-xs btn-ghost" onclick="ConfigModule.editPromo(${p.id})">Editar</button>
@@ -890,6 +892,7 @@ const ConfigModule = (() => {
         tipo:      p.tipo      || '',
         price:     p.price     || 0,
         semana:    p.semana    || '',
+        grams:     p.grams     || 0,
         items:     p.items     || [],
         notes:     p.notes     || '',
         active:    !!p.active,
