@@ -52,12 +52,17 @@ const DashboardModule = (() => {
       return (promo.items || []).reduce((s, pi) => s + getMasaGrams(pi.format) * (pi.qty || 1), 0);
     }
 
+    function resolveFormatKey(item) {
+      return (item.format || '').toLowerCase() === 'promo' ? (item.flavor || '') : (item.format || '');
+    }
+
     function masaDeOrders(orders) {
       let g = 0;
       orders.forEach(o => {
         (o.items || []).forEach(item => {
           const qty = item.qty || 1;
-          g += qty * getMasaParaItem(item.format);
+          const key = resolveFormatKey(item);
+          g += qty * getMasaParaItem(key);
           const n = (item.format || '').toLowerCase();
           if ((n.includes('puglia') || n.includes('familiar') || n.includes('messi')) && tieneRegalo(item.flavor)) {
             g += qty * MASA_G.chica;
