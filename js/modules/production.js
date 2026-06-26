@@ -220,13 +220,13 @@ const ProductionModule = (() => {
     const rows = activos.map(o => {
       const masaO = masaDeOrders([o]);
       const [badgeCls, badgeLabel] = STATUS_LABEL[o.status] || ['badge-default', o.status];
-      const itemsStr = (o.items || [])
-        .map(i => {
-          const key = resolveFormatKey(i);
-          const g   = getMasaParaItem(key);
-          return `${i.qty||1}× ${key || i.name || '?'} (${g * (i.qty||1)}g)`;
-        })
-        .join(', ') || '—';
+      const itemsStr = (o.items || []).length === 0
+        ? 'sin ítems'
+        : (o.items || []).map(i => {
+            const key = resolveFormatKey(i);
+            const g   = getMasaParaItem(key);
+            return (i.format||'?') + '|' + (i.flavor||'-') + '→' + g + 'g';
+          }).join(' / ');
       const entrega = o.deliveryDate
         ? new Date(o.deliveryDate + 'T12:00:00').toLocaleDateString('es-AR', { day:'numeric', month:'short' })
         : '—';
