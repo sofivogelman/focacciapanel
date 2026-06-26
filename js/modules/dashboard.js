@@ -45,8 +45,15 @@ const DashboardModule = (() => {
     function getMasaParaItem(formatName) {
       const base = getMasaGrams(formatName);
       if (base) return base;
+      const fn = (formatName || '').toLowerCase();
+      const matchPromo = p => {
+        const pn = (p.name || '').toLowerCase();
+        return pn && (pn === fn || fn.startsWith(pn) || pn.startsWith(fn));
+      };
       const promo = Store.promos.where(p => p.name === formatName)[0]
-                 || _promosCache.find(p => p.name === formatName);
+                 || _promosCache.find(p => p.name === formatName)
+                 || Store.promos.all().find(matchPromo)
+                 || _promosCache.find(matchPromo);
       if (!promo) return 0;
       if (promo.grams) return promo.grams;
       return (promo.items || []).reduce((s, pi) => s + getMasaGrams(pi.format) * (pi.qty || 1), 0);
