@@ -41,7 +41,13 @@ const App = (() => {
   let activeModalOnClose = null;
 
   function openModal({ title, body, primaryLabel = 'Confirmar', onConfirm, hideCancelBtn = false, size = '', onOpen, onClose }) {
-    closeModal();
+    // Eliminar backdrop anterior de inmediato (sin esperar animación) para evitar IDs duplicados en el DOM
+    if (activeModal) {
+      activeModalOnClose?.();
+      activeModal.remove();
+      activeModal = null;
+      document.removeEventListener('keydown', handleEsc);
+    }
     activeModalOnClose = onClose || null;
 
     const backdrop = document.createElement('div');
