@@ -1,8 +1,8 @@
-const AnalyticsModule = (() => {
+﻿const AnalyticsModule = (() => {
 
   // ─── Sabores canónicos ────────────────────────────────────────────────────────
   const FLAVORS_FIXED = [
-    'Romero y Sal',
+    'Clásica (Romero y Sal)',
     'Papa y Parmesano',
     'Tomate Cherry y Pesto',
     'Aceitunas',
@@ -10,7 +10,7 @@ const AnalyticsModule = (() => {
 
   function canonicalFlavor(s) {
     const f = (s || '').toLowerCase();
-    if (f.includes('romero'))                                              return 'Romero y Sal';
+    if (f.includes('romero') || f.includes('clásica') || f.includes('clasica')) return 'Clásica (Romero y Sal)';
     if (f.includes('papa') || f.includes('parmesano'))                    return 'Papa y Parmesano';
     if (f.includes('tomate') || f.includes('cherry') || f.includes('pesto')) return 'Tomate Cherry y Pesto';
     if (f.includes('aceitun'))                                             return 'Aceitunas';
@@ -114,21 +114,33 @@ const AnalyticsModule = (() => {
     const orders = Store.orders.all();
 
     // Sabores: normalización a los 4 canónicos
-    // Usa getFlavorText para cubrir tanto item.flavor como item.name con " — "
-    // Degustación cuenta como 1 de cada sabor × qty
-    const flavorMap = { 'Romero y Sal': 0, 'Papa y Parmesano': 0, 'Tomate Cherry y Pesto': 0, 'Aceitunas': 0 };
+    const allPromos = Store.promos.all();
+    function normFmt(s) { return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); }
+    function isPromoItem(item) {
+      if ((item.format||'').toLowerCase().startsWith('promo')) return true;
+      const fn = normFmt(item.format);
+      return allPromos.some(p => { const pn = normFmt(p.name); return pn && fn && (pn===fn || fn.startsWith(pn) || pn.startsWith(fn)); });
+    }
+    const flavorMap = Object.fromEntries(FLAVORS_FIXED.map(f => [f, 0]));
     orders.forEach(o => {
       (o.items || []).forEach(item => {
         const qty = item.qty || 1;
-        // Degustación antes del filtro de promos — puede venir con format 'Promo'
         if (isDegustacion(item)) {
           FLAVORS_FIXED.forEach(fl => { flavorMap[fl] += qty; });
           return;
         }
-        // Saltear promos que no son degustación (Promo, Promo25, etc.)
-        if ((item.format || '').toLowerCase().startsWith('promo')) return;
-        const cf = canonicalFlavor(getFlavorText(item));
-        if (cf) flavorMap[cf] += qty;
+        if (isPromoItem(item)) return;
+        const flavorText = getFlavorText(item);
+        // Multi-sabor (nuevo sistema de checkboxes): "Clásica / Papa y Parmesano" → contar 1 c/u
+        if (flavorText.includes(' / ')) {
+          flavorText.split(' / ').forEach(sf => {
+            const cf = canonicalFlavor(sf.trim());
+            if (cf) flavorMap[cf]++;
+          });
+        } else {
+          const cf = canonicalFlavor(flavorText);
+          if (cf) flavorMap[cf] += qty;
+        }
       });
     });
     const flavors = FLAVORS_FIXED
@@ -238,6 +250,15 @@ const AnalyticsModule = (() => {
       const flavorN = norm(item.flavor);
       const nameN   = norm(item.name);
       const all     = fmtN + ' ' + flavorN + ' ' + nameN;
+
+      // Regla 0: formato o sabor coincide con nombre de promo (cubre promos esFormato: "La Previa 🍷", "Box Mundialista ⚽", etc.)
+      const byName = promos.find(p => {
+        const pn = norm(p.name);
+        if (!pn) return false;
+        return pn === fmtN || fmtN.startsWith(pn) || pn.startsWith(fmtN) ||
+               (flavorN && (pn === flavorN || flavorN.startsWith(pn) || pn.startsWith(flavorN)));
+      });
+      if (byName) return byName;
 
       // Regla 1: dice explícitamente "promo 25" o "promo25" → Promo 25 (dos familiares)
       if (all.includes('promo 25') || all.includes('promo25')) {
