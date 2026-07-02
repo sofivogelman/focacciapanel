@@ -192,7 +192,7 @@ const Store = (() => {
       const ingredients = load('ingredients');
 
       const thisMonth   = new Date().toISOString().slice(0, 7);
-      const monthOrders = orders.filter(o => o.date.startsWith(thisMonth));
+      const monthOrders = orders.filter(o => (o.deliveryDate || o.date || '').startsWith(thisMonth));
       const revenue     = monthOrders.filter(o => o.paid).reduce((s, o) => s + o.total, 0);
       const monthExpenses = expenses.filter(e => e.date.startsWith(thisMonth)).reduce((s, e) => s + e.amount, 0);
       const pending     = orders.filter(o => o.status === 'pendiente').length;
