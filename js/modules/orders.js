@@ -198,9 +198,15 @@ const OrdersModule = (() => {
         <label class="form-label">Notas <span>(opcional)</span></label>
         <textarea class="form-textarea" id="fOrderNotes" placeholder="Indicaciones especiales…">${isEdit ? o.notes : ''}</textarea>
       </div>
-      <div style="padding: var(--space-3) var(--space-4); background: var(--color-primary-subtle); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-        <span class="text-sm font-medium text-primary">Total del pedido</span>
-        <span class="text-xl font-semibold text-primary" id="orderTotal">${isEdit ? '$' + o.total.toLocaleString('es-AR') : '$0'}</span>
+      <div style="padding: var(--space-3) var(--space-4); background: var(--color-primary-subtle); border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; gap: var(--space-4)">
+        <span class="text-sm font-medium text-primary" style="white-space:nowrap">Total del pedido</span>
+        <div style="display:flex;align-items:center;gap:var(--space-1)">
+          <span class="text-xl font-semibold text-primary">$</span>
+          <input type="number" id="orderTotal" min="0" step="1"
+            value="${isEdit ? o.total : 0}"
+            style="font-size:var(--text-xl);font-weight:600;color:var(--color-primary);width:140px;text-align:right;border:1px dashed var(--color-primary);border-radius:var(--radius-sm);background:transparent;padding:2px 6px"
+            title="Podés editar el total manualmente" />
+        </div>
       </div>
       <input type="hidden" id="fOrderItems" value='${itemsValue.replace(/'/g, "&apos;")}' />
     `;
@@ -271,7 +277,7 @@ const OrdersModule = (() => {
           rows.push({ productId: null, name: opt.text.split(' — ')[0], qty, price, format: opt.dataset.format || '', flavor: opt.dataset.flavor || '' });
         }
       });
-      totalEl.textContent = '$' + total.toLocaleString('es-AR');
+      totalEl.value = total;
       hiddenEl.value = JSON.stringify(rows);
       // Auto-detectar promo (solo si no fue cambiada manualmente)
       const promoSel = document.getElementById('fOrderPromo');
@@ -348,7 +354,7 @@ const OrdersModule = (() => {
     const lote         = document.getElementById('fOrderLote').value.trim();
     const deliveryTime = document.getElementById('fOrderDeliveryTime')?.value || '';
     const promoId      = document.getElementById('fOrderPromo')?.value || '';
-    const total = items.reduce((s, i) => s + i.qty * i.price, 0);
+    const total = parseFloat(document.getElementById('orderTotal').value) || items.reduce((s, i) => s + i.qty * i.price, 0);
     const data  = { clientId, clientName: client?.name || '', date, deliveryDate: delivery, deliveryTime, promoId, status, items, total, paymentMethod: payment, paid, notes, zone, lote };
 
     if (editId) {
