@@ -212,7 +212,18 @@ const DashboardModule = (() => {
 
   // ─── Render principal ────────────────────────────────────────────────────────
   function render(container) {
-    const stats    = Store.stats();
+    const thisMonth    = new Date().toISOString().slice(0, 7);
+    const monthOrders  = Store.orders.where(o => (o.deliveryDate || o.date || '').startsWith(thisMonth));
+    const revenue      = monthOrders.filter(o => o.paid).reduce((s, o) => s + o.total, 0);
+    const monthExpenses = Store.expenses.where(e => e.date.startsWith(thisMonth)).reduce((s, e) => s + e.amount, 0);
+    const stats = {
+      revenue,
+      monthExpenses,
+      profit:      revenue - monthExpenses,
+      pending:     Store.orders.where(o => o.status === 'pendiente').length,
+      totalOrders: monthOrders.length,
+      lowStock:    Store.ingredients.where(i => i.stock <= i.minStock).length,
+    };
     const lowStock = Store.ingredients.where(i => i.stock <= i.minStock * 1.3);
     const gasCount = Store.orders.where(o => o.fromGAS).length;
 
