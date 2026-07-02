@@ -74,14 +74,18 @@ const Store = (() => {
 
   function nextId(collection) {
     if (!collection.length) return 1;
-    return Math.max(...collection.map(r => r.id)) + 1;
+    const validIds = collection.map(r => Number(r.id)).filter(n => Number.isFinite(n) && n > 0);
+    return (validIds.length ? Math.max(...validIds) : 0) + 1;
   }
 
   // ─── Generic CRUD factory ────────────────────────────────────────────────────
   function collection(name) {
     return {
       all()        { return load(name); },
-      find(id)     { return load(name).find(r => r.id === id) || null; },
+      find(id)     {
+        const numId = Number(id);
+        return load(name).find(r => r.id === numId || r.id === id) || null;
+      },
       where(fn)    { return load(name).filter(fn); },
       create(data) {
         const col = load(name);
@@ -92,9 +96,10 @@ const Store = (() => {
       },
       update(id, data) {
         const col = load(name);
-        const idx = col.findIndex(r => r.id === id);
+        const numId = Number(id);
+        const idx = col.findIndex(r => r.id === numId || r.id === id);
         if (idx === -1) return null;
-        col[idx] = { ...col[idx], ...data };
+        col[idx] = { ...col[idx], ...data, id: col[idx].id };  // preserva el id original siempre
         save(name, col);
         return col[idx];
       },
