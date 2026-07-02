@@ -6,12 +6,73 @@ const FinancesModule = (() => {
   function currentMonth() { return new Date().toISOString().slice(0, 7); }
 
   function getMonthData(month) {
-    const orders   = Store.orders.where(o => o.date.startsWith(month));
+    const orders   = Store.orders.where(o => (o.deliveryDate || o.date || '').startsWith(month));
     const expenses = Store.expenses.where(e => e.date.startsWith(month));
     const revenue  = orders.filter(o => o.paid).reduce((s, o) => s + o.total, 0);
-    const pending  = orders.filter(o => !o.paid).reduce((s, o) => s + o.total, 0);
+    const pending  = orders.filter(o => !o.paid && o.status !== 'cancelado').reduce((s, o) => s + o.total, 0);
     const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
     return { orders, expenses, revenue, pending, totalExp, profit: revenue - totalExp };
+  }
+
+  function openMonthDetail(month, label) {
+    const d = getMonthData(month);
+    const nonCancelled = d.orders.filter(o => o.status !== 'cancelado')
+      .sort((a, b) => (a.deliveryDate || a.date).localeCompare(b.deliveryDate || b.date));
+    const ordersHtml = nonCancelled.length === 0
+      ? '<div class="empty-state" style="padding:var(--space-4)"><div class="empty-state-title">Sin pedidos este mes</div></div>'
+      : `<table class="table" style="margin-bottom:var(--space-2)">
+          <thead><tr><th>Cliente</th><th>Entrega</th><th>Total</th><th>Pago</th></tr></thead>
+          <tbody>
+            ${nonCancelled.map(o => `
+              <tr>
+                <td class="font-medium">${o.clientName || '—'}</td>
+                <td class="text-sm text-secondary">${o.deliveryDate || o.date || '—'}</td>
+                <td class="font-medium">${fmt(o.total)}</td>
+                <td><span class="badge ${o.paid ? 'badge-success' : 'badge-default'}">${o.paid ? 'Cobrado' : 'Pendiente'}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    const expensesHtml = d.expenses.length === 0
+      ? '<div class="empty-state" style="padding:var(--space-4)"><div class="empty-state-title">Sin gastos este mes</div></div>'
+      : `<table class="table">
+          <thead><tr><th>Fecha</th><th>Descripción</th><th class="td-hide-mobile">Categoría</th><th>Monto</th></tr></thead>
+          <tbody>
+            ${d.expenses.sort((a, b) => a.date.localeCompare(b.date)).map(e => `
+              <tr>
+                <td class="text-sm text-secondary">${e.date}</td>
+                <td>${e.description}</td>
+                <td class="td-hide-mobile"><span class="badge badge-default">${EXP_CATS[e.category] || e.category}</span></td>
+                <td class="text-danger font-medium">${fmt(e.amount)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    App.openModal({
+      title: `Detalle — ${label}`,
+      size: 'modal-lg',
+      hideCancelBtn: true,
+      primaryLabel: 'Cerrar',
+      onConfirm: () => {},
+      body: `
+        <div class="d-flex gap-3" style="margin-bottom:var(--space-5)">
+          <div class="stat-card" style="flex:1;padding:var(--space-3) var(--space-4);--stat-color:var(--color-primary)">
+            <div class="stat-label">Cobrado</div>
+            <div class="stat-value" style="font-size:var(--text-xl)">${fmt(d.revenue)}</div>
+          </div>
+          <div class="stat-card" style="flex:1;padding:var(--space-3) var(--space-4);--stat-color:var(--color-warning)">
+            <div class="stat-label">Por cobrar</div>
+            <div class="stat-value" style="font-size:var(--text-xl)">${fmt(d.pending)}</div>
+          </div>
+          <div class="stat-card" style="flex:1;padding:var(--space-3) var(--space-4);--stat-color:var(--color-accent)">
+            <div class="stat-label">Gastos</div>
+            <div class="stat-value" style="font-size:var(--text-xl)">${fmt(d.totalExp)}</div>
+          </div>
+        </div>
+        <div style="font-weight:600;font-size:var(--text-sm);margin-bottom:var(--space-2)">Pedidos</div>
+        ${ordersHtml}
+        <div style="font-weight:600;font-size:var(--text-sm);margin:var(--space-4) 0 var(--space-2)">Gastos</div>
+        ${expensesHtml}
+      `,
+    });
   }
 
   function renderExpRow(e) {
@@ -649,7 +710,7 @@ const FinancesModule = (() => {
                 const isCurrent = m.key === current;
                 const dash = `<span style="color:var(--color-text-muted)">—</span>`;
                 return `
-                  <tr${isCurrent ? ' style="background:var(--color-primary-subtle,#f0f7f4)"' : ''}>
+                  <tr style="cursor:pointer${isCurrent ? ';background:var(--color-primary-subtle,#f0f7f4)' : ''}" onclick="FinancesModule.openMonthDetail('${m.key}', '${m.label}')">
                     <td class="font-medium text-sm" style="text-transform:capitalize">
                       ${m.label}${isCurrent ? ' <span class="badge badge-primary" style="margin-left:4px">Actual</span>' : ''}
                     </td>
@@ -670,6 +731,9 @@ const FinancesModule = (() => {
     const month   = currentMonth();
     const data    = getMonthData(month);
     const months  = relevantMonths();
+    const allPendingOrders = Store.orders.where(o => !o.paid && o.status !== 'cancelado');
+    const allPending       = allPendingOrders.reduce((s, o) => s + o.total, 0);
+    const allPendingCount  = allPendingOrders.length;
     const expsByMonth = months.map(m => {
       const d = getMonthData(m.key);
       return { ...m, revenue: d.revenue, expenses: d.totalExp };
@@ -697,8 +761,8 @@ const FinancesModule = (() => {
           </div>
           <div class="stat-card" style="--stat-color:var(--color-warning)">
             <div class="stat-label">Por cobrar</div>
-            <div class="stat-value">${fmt(data.pending)}</div>
-            <div class="stat-meta">Pedidos sin cobrar</div>
+            <div class="stat-value">${fmt(allPending)}</div>
+            <div class="stat-meta">${allPendingCount} pedido${allPendingCount !== 1 ? 's' : ''} pendiente${allPendingCount !== 1 ? 's' : ''}</div>
           </div>
           <div class="stat-card" style="--stat-color:var(--color-accent)">
             <div class="stat-label">Gastos este mes</div>
@@ -793,5 +857,5 @@ const FinancesModule = (() => {
     render(document.getElementById('pageContent'));
   }
 
-  return { render, openCreateModal, openEditExpense, removeExpense, importFromExcel, openWithReceipt, clearAllExpenses, toggleStockFields, onIngredientChange, addReceiptRow, recalcReceiptTotal, onReceiptIngChange };
+  return { render, openCreateModal, openEditExpense, removeExpense, importFromExcel, openWithReceipt, clearAllExpenses, toggleStockFields, onIngredientChange, addReceiptRow, recalcReceiptTotal, onReceiptIngChange, openMonthDetail };
 })();
