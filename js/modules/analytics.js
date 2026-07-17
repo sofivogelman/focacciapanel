@@ -6,14 +6,16 @@
     'Papa y Parmesano',
     'Tomate Cherry y Pesto',
     'Aceitunas',
+    'Cebolla',
   ];
 
   function canonicalFlavor(s) {
-    const f = (s || '').toLowerCase();
+    const f = (s || '').replace(/^\d+x\s+/i, '').toLowerCase();
     if (f.includes('romero') || f.includes('clásica') || f.includes('clasica')) return 'Clásica (Romero y Sal)';
     if (f.includes('papa') || f.includes('parmesano'))                    return 'Papa y Parmesano';
     if (f.includes('tomate') || f.includes('cherry') || f.includes('pesto')) return 'Tomate Cherry y Pesto';
     if (f.includes('aceitun'))                                             return 'Aceitunas';
+    if (f.includes('cebolla'))                                             return 'Cebolla';
     return null;
   }
 
@@ -134,8 +136,11 @@
         // Multi-sabor (nuevo sistema de checkboxes): "Clásica / Papa y Parmesano" → contar 1 c/u
         if (flavorText.includes(' / ')) {
           flavorText.split(' / ').forEach(sf => {
-            const cf = canonicalFlavor(sf.trim());
-            if (cf) flavorMap[cf]++;
+            const part = sf.trim();
+            const qtyMatch = part.match(/^(\d+)x\s+/i);
+            const partQty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+            const cf = canonicalFlavor(part);
+            if (cf) flavorMap[cf] += partQty;
           });
         } else {
           const cf = canonicalFlavor(flavorText);
