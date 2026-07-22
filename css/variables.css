@@ -1,20 +1,20 @@
 :root {
-  /* Colors — Crema + Teal + Dorado */
-  --color-primary: #1A7A8C;
-  --color-primary-dark: #145F6E;
-  --color-primary-light: #2A9BAF;
-  --color-primary-muted: #7DBFCC;
-  --color-primary-subtle: #E0F0F4;
+  /* Colors — Crema + Sage Green + Dorado */
+  --color-primary: #6B7C52;
+  --color-primary-dark: #4A5A3A;
+  --color-primary-light: #8A9E6A;
+  --color-primary-muted: #ABBE8E;
+  --color-primary-subtle: #E4EBD9;
 
-  --color-bg: #F5F0E8;
-  --color-surface: #FDFAF5;
+  --color-bg: #F6F3EE;
+  --color-surface: #FDFCF9;
   --color-surface-alt: #EDE8DC;
 
   --color-border: #D6C9B0;
   --color-border-light: #E8E0D0;
 
-  --color-text: #1A2A32;
-  --color-text-secondary: #5A6870;
+  --color-text: #2A3220;
+  --color-text-secondary: #5A6050;
   --color-text-muted: #9A9490;
 
   --color-accent: #C4921F;
