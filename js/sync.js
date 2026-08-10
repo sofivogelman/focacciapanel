@@ -164,8 +164,14 @@ const Sync = (() => {
     const orderDate = toISODate(row.date)
       || toISODate(row.timestamp)
       || new Date().toISOString().slice(0, 10);
-    const delivDate = new Date(new Date(orderDate + 'T12:00:00').getTime() + 2 * 864e5)
-      .toISOString().slice(0, 10);
+
+    // row.dia = "2026-08-12 - 🌇 Tarde" — extraer fecha y momento por separado
+    const diaParts   = (row.dia || '').split(' - ');
+    const diaDate    = toISODate((diaParts[0] || '').trim());
+    const diaMomento = diaParts.slice(1).join(' - ').trim();
+
+    const delivDate = diaDate
+      || new Date(new Date(orderDate + 'T12:00:00').getTime() + 2 * 864e5).toISOString().slice(0, 10);
 
     return {
       clientId:     client?.id || null,
@@ -179,7 +185,7 @@ const Sync = (() => {
       total,
       paymentMethod: 'indefinido',
       paid:          false,
-      notes:         [row.dia, row.notes].filter(Boolean).join(' · ') || '',
+      notes:         [diaMomento, row.notes].filter(Boolean).join(' · ') || '',
       zone:          row.zone  || '',
       fromGAS:       true,
       gasTimestamp:  row.timestamp || '',
